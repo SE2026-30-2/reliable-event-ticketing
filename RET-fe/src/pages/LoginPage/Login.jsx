@@ -29,7 +29,7 @@ export default function Login() {
             login(userData, token);
 
             // Đăng nhập thành công, chuyển hướng về trang chủ
-            navigate('/');
+            navigate('/home');
         } catch (err) {
             console.error('Lỗi đăng nhập:', err);
             setError(err.message || 'Email hoặc mật khẩu không chính xác.');

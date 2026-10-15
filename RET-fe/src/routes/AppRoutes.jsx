@@ -2,6 +2,8 @@ import { Routes, Route } from 'react-router-dom'
 import LandingPage from '../pages/LandingPage'
 import Login from '../pages/LoginPage/Login'
 import Register from '../pages/RegisterPage/Register';
+import Home from '../pages/HomePage/Home';
+import PrivateRoute from './PrivateRoute';
 
 // Import thêm các trang khác sau này ở đây
 
@@ -12,6 +14,14 @@ export default function AppRoutes() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route
+                path="/home"
+                element={
+                    <PrivateRoute>
+                        <Home />
+                    </PrivateRoute>
+                }
+            />
         </Routes>
     )
 }
