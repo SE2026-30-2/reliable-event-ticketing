@@ -1,20 +1,55 @@
 import axios from 'axios';
 
+const baseURL = import.meta.env.VITE_USER_SERVICE_URL || 'http://localhost:8087';
+
+let currentToken = localStorage.getItem('access_token') || null;
+
 const axiosClient = axios.create({
-    baseURL: 'https://api.yourbackend.com/v1', // Đường dẫn API backend của bạn
+    baseURL,
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-axiosClient.interceptors.request.use((config) => {
-    const token = localStorage.getItem('access_token');
+export const setAuthToken = (token) => {
+    currentToken = token;
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        axiosClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+        delete axiosClient.defaults.headers.common['Authorization'];
     }
-    return config;
-}, (error) => {
-    return Promise.reject(error);
-});
+};
+
+// Nếu đã có token từ trước, gắn sẵn vào default header
+if (currentToken) {
+    setAuthToken(currentToken);
+}
+
+// Interceptor request
+axiosClient.interceptors.request.use(
+    (config) => {
+        const token = currentToken || localStorage.getItem('access_token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Interceptor response: trả về thẳng data và bóc tách error message rõ ràng
+axiosClient.interceptors.response.use(
+    (response) => response.data,
+    (error) => {
+        const message =
+            error.response?.data?.message ||
+            error.response?.data?.detail ||
+            error.response?.data?.error ||
+            (Array.isArray(error.response?.data?.details) && error.response.data.details.join('; ')) ||
+            error.message ||
+            'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+        return Promise.reject(new Error(message));
+    }
+);
 
 export default axiosClient;

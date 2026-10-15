@@ -1,5 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import LandingPage from '../pages/LandingPage'
+import Login from '../pages/LoginPage/Login'
+import Register from '../pages/RegisterPage/Register';
 
 // Import thêm các trang khác sau này ở đây
 
@@ -8,10 +10,8 @@ export default function AppRoutes() {
         <Routes>
             {/* Route chính / */}
             <Route path="/" element={<LandingPage />} />
-
-            {/* Các route khác ví dụ sau này: */}
-            {/* <Route path="/login" element={<LoginPage />} /> */}
-            {/* <Route path="*" element={<NotFoundPage />} /> */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
         </Routes>
     )
 }
