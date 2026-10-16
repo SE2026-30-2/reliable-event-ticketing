@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 
@@ -12,6 +12,7 @@ export default function Login() {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -29,7 +30,8 @@ export default function Login() {
             login(userData, token);
 
             // Đăng nhập thành công, chuyển hướng về trang chủ
-            navigate('/home');
+            const destination = location.state?.from;
+            navigate(typeof destination === 'string' && destination.startsWith('/') && !destination.startsWith('//') ? destination : '/home', { replace: true });
         } catch (err) {
             console.error('Lỗi đăng nhập:', err);
             setError(err.message || 'Email hoặc mật khẩu không chính xác.');

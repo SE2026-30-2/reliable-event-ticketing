@@ -4,6 +4,7 @@ import Login from '../pages/LoginPage/Login'
 import Register from '../pages/RegisterPage/Register';
 import Home from '../pages/HomePage/Home';
 import PrivateRoute from './PrivateRoute';
+import ManageEvents from '../pages/ManageEventsPage/ManageEvents';
 
 // Import thêm các trang khác sau này ở đây
 
@@ -14,6 +15,8 @@ export default function AppRoutes() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/manage" element={<PrivateRoute><ManageEvents /></PrivateRoute>} />
+            {import.meta.env.DEV && <Route path="/manage/preview" element={<ManageEvents preview />} />}
             <Route
                 path="/home"
                 element={
