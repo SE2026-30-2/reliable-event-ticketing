@@ -4,6 +4,7 @@ import Login from '../pages/LoginPage/Login'
 import Register from '../pages/RegisterPage/Register';
 import Home from '../pages/HomePage/Home';
 import PrivateRoute from './PrivateRoute';
+import Profile from '../pages/ProfilePage/Profile';
 
 // Import thêm các trang khác sau này ở đây
 
@@ -19,6 +20,15 @@ export default function AppRoutes() {
                 element={
                     <PrivateRoute>
                         <Home />
+                    </PrivateRoute>
+                }
+            />
+
+            <Route
+                path="/profile"
+                element={
+                    <PrivateRoute>
+                        <Profile />
                     </PrivateRoute>
                 }
             />
