@@ -1,0 +1,222 @@
+services:
+  # GateKeep (Port 8091) - modular monolith: catalog, payment, checkin, notification.
+  # Replaces the old ticket-service/notification-service (and checkin-service, which never had any
+  # code) - see docs/architecture.md for the module breakdown.
+  ticketing-platform:
+    build:
+      context: ./backend/ticketing-platform
+    image: ticketing-platform:local
+    container_name: ticketing-platform
+    restart: unless-stopped
+    mem_limit: 768m
+    ports:
+      - "8091:8080"  # External:8091 -> Container:8080
+    volumes:
+      # Persists the QR-payload signing key across container recreation - see catalog's
+      # RsaKeyProvider. Without this, every redeploy would invalidate every QR code already
+      # issued/printed (same rationale as user-service-keys below, independent key material).
+      - ticketing-platform-keys:/app/keys
+    depends_on:
+      postgres-ticketing-platform:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    environment:
+      # See product-service's SERVER_PORT comment style elsewhere in this file - this app's own
+      # application.properties sets server.port=8091 for host-local (non-Docker) runs.
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-ticketing-platform:5432/ticketing_platform
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${TICKETING_DB_PASSWORD:?set TICKETING_DB_PASSWORD in .env (see .env.example)}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:29092
+      SECURITY_JWT_JWK_SET_URI: http://user-service:8087/.well-known/jwks.json
+      TICKETING_QR_PRIVATE_KEY_PATH: /app/keys/ticket_signing_key.pem
+      TICKETING_QR_REQUIRE_EXISTING_KEY: "false"
+      SPRING_MAIL_HOST: ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@gatekeep.example}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-true}
+      # Demo hook letting a caller choose the payment result. false unless .env opts in (local demo only).
+      TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME: ${TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME:-false}
+      TICKETING_REQUIRE_VERIFIED_EMAIL: ${TICKETING_REQUIRE_VERIFIED_EMAIL:-true}
+      TICKETING_PAYMENT_PROVIDER: ${TICKETING_PAYMENT_PROVIDER:-mock}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-}
+      VNPAY_PAY_URL: ${VNPAY_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_API_URL: ${VNPAY_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      TICKETING_PAYMENT_RECONCILE_MS: ${TICKETING_PAYMENT_RECONCILE_MS:-60000}
+      TICKETING_TRANSFER_MAX: ${TICKETING_TRANSFER_MAX:-2}
+      TICKETING_TRANSFER_CUTOFF_MINUTES: ${TICKETING_TRANSFER_CUTOFF_MINUTES:-60}
+      TICKETING_WAITLIST_INTERVAL_MS: ${TICKETING_WAITLIST_INTERVAL_MS:-30000}
+      # Only behind a reverse proxy that overwrites X-Forwarded-For (see RateLimitFilter).
+      TICKETING_RATE_LIMIT_TRUST_FORWARDED_FOR: ${TICKETING_RATE_LIMIT_TRUST_FORWARDED_FOR:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health/liveness"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  postgres-ticketing-platform:
+    image: postgres:16-alpine
+    container_name: postgres-ticketing-platform
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      - "127.0.0.1:5437:5432"  # Loopback-only, see postgres-inventory-service comment style
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${TICKETING_DB_PASSWORD:?set TICKETING_DB_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: ticketing_platform
+    volumes:
+      - postgres-ticketing-platform-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # User Service (Port 8087)
+  # NOTE: unlike the other services here, this container's internal listen port is 8087 (its own
+  # server.port), not 8080 - the port mapping and every downstream URL below reflect that.
+  user-service:
+    build:
+      context: ./backend/user-service
+    image: gatekeep/user-service:local
+    container_name: user-service
+    restart: unless-stopped
+    mem_limit: 768m
+    ports:
+      - "8087:8087"  # External:8087 -> Container:8087
+    volumes:
+      # Persists the generated RSA signing key across container recreation - see RsaKeyProvider.
+      # Without this, every redeploy would generate a fresh key and invalidate all issued JWTs.
+      - user-service-keys:/app/keys
+    depends_on:
+      postgres-user-service:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-user-service:5432/user_service
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${USER_DB_PASSWORD:?set USER_DB_PASSWORD in .env (see .env.example)}
+      SPRING_FLYWAY_LOCATIONS: ${USER_SERVICE_FLYWAY_LOCATIONS:-classpath:db/migration}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:29092
+      SECURITY_JWT_PRIVATE_KEY_PATH: /app/keys/private_key.pem
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health/liveness"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  postgres-user-service:
+    image: postgres:16-alpine
+    container_name: postgres-user-service
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      - "127.0.0.1:5436:5432"  # Loopback-only, see postgres-inventory-service comment
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${USER_DB_PASSWORD:?set USER_DB_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: user_service
+    volumes:
+      - postgres-user-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Kafka Infrastructure
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      - "127.0.0.1:2181:2181"  # Loopback-only - no auth on this port, same rationale as DB ports
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      # Not "echo ruok | nc ... | grep imok": this image's zookeeper.properties.template has no
+      # mapping for ZOOKEEPER_4LW_COMMANDS_WHITELIST, so the "ruok" four-letter-word command is
+      # always rejected ("... is not in the whitelist") with no supported way to allow-list it
+      # short of mounting a custom zoo.cfg. A plain TCP connect check is weaker (only proves the
+      # port is accepting connections, not that ZK considers itself healthy) but needs no such
+      # workaround.
+      test: ["CMD-SHELL", "nc -z -w 2 localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  broker:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: broker
+    restart: unless-stopped
+    mem_limit: 1g
+    ports:
+      # Loopback-only - unauthenticated PLAINTEXT broker, same rationale as DB ports above.
+      - "127.0.0.1:9092:9092"   # Kafka external port
+      - "127.0.0.1:29092:29092"  # Kafka internal port for container communication
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  # Kafka UI (Port 8086)
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:v0.7.2
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      # Loopback-only - this is an operator/debug tool with full read/write access to every Kafka
+      # topic (including saga event payloads) and, by default, no login screen of its own.
+      - "127.0.0.1:8086:8080"
+    depends_on:
+      - broker
+    environment:
+      KAFKA_CLUSTERS_NAME: local
+      KAFKA_CLUSTERS_BOOTSTRAP_SERVERS: 'broker:29092'
+      DYNAMIC_CONFIG_ENABLED: 'true'
+    healthcheck:
+      # This image is Alpine-based with BusyBox wget (no curl, no bash) - see the image's
+      # /etc/os-release. -O /dev/null discards the body, exit code alone tells us 200 vs not.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  postgres-user-data:
+  user-service-keys:
+  postgres-ticketing-platform-data:
+  ticketing-platform-keys:

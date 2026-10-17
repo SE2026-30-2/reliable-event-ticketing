@@ -28,6 +28,12 @@ if (currentToken) {
 // Interceptor request
 axiosClient.interceptors.request.use(
     (config) => {
+        // Public authentication requests must not carry an expired session token,
+        // including Authorization inherited from the client defaults.
+        if (config.skipAuth) {
+            config.headers.delete('Authorization');
+            return config;
+        }
         const token = currentToken || localStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
