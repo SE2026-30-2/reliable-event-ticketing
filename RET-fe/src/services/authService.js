@@ -1,13 +1,14 @@
-import axiosClient from './axiosClient';
+import axiosClient, { USER_SERVICE_URL } from './axiosClient';
 
 export const authService = {
     login: async (credentials) => {
-        // credentials chứa { email, password }
-        return axiosClient.post('/api/user/login', credentials);
+        return axiosClient.post('/api/user/login', credentials, {
+            baseURL: USER_SERVICE_URL,
+        });
     },
-
     register: async (userData) => {
-        // userData chứa { email, password, fullName }
-        return axiosClient.post('/api/user/register', userData);
+        return axiosClient.post('/api/user/register', userData, {
+            baseURL: USER_SERVICE_URL,
+        });
     },
 };

@@ -24,9 +24,10 @@ export default function Login() {
 
             // Hỗ trợ linh hoạt các kiểu response từ backend: { token, user }, { accessToken, user }, ...
             const token = data?.token || data?.accessToken || data?.access_token;
+            const refreshToken = data?.refreshToken;
             const userData = data?.user || { email };
 
-            login(userData, token);
+            login(userData, token, refreshToken);
 
             // Đăng nhập thành công, chuyển hướng về trang chủ
             navigate('/home');

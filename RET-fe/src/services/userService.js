@@ -1,30 +1,20 @@
-import axiosClient from './axiosClient';
+import axiosClient, { USER_SERVICE_URL } from './axiosClient';
 
 export const userService = {
-    /**
-     * Lấy thông tin cá nhân của người dùng hiện tại
-     * GET /api/user/me
-     */
     getProfile: async () => {
-        const response = await axiosClient.get('/api/user/me');
-        return response.data;
+        return axiosClient.get('/api/user/me', { baseURL: USER_SERVICE_URL });
     },
 
-    /**
-     * Đăng xuất tài khoản
-     * POST /api/user/logout
-     */
     logout: async () => {
-        const response = await axiosClient.post('/api/user/logout');
-        return response.data;
+        const refreshToken = localStorage.getItem('refresh_token');
+        return axiosClient.post(
+            '/api/user/logout',
+            { refreshToken: refreshToken || '' },
+            { baseURL: USER_SERVICE_URL }
+        );
     },
 
-    /**
-     * Gửi lại email xác minh tài khoản
-     * POST /api/user/email/verify/resend
-     */
     resendVerificationEmail: async () => {
-        const response = await axiosClient.post('/api/user/email/verify/resend');
-        return response.data;
+        return axiosClient.post('/api/user/email/verify/resend', {}, { baseURL: USER_SERVICE_URL });
     },
 };
