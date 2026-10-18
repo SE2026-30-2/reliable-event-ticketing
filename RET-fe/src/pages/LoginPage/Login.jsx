@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 import { authService } from '../../services/authService';
 
 export default function Login() {
@@ -25,9 +25,10 @@ export default function Login() {
 
             // Hỗ trợ linh hoạt các kiểu response từ backend: { token, user }, { accessToken, user }, ...
             const token = data?.token || data?.accessToken || data?.access_token;
+            const refreshToken = data?.refreshToken;
             const userData = data?.user || { email };
 
-            login(userData, token);
+            login(userData, token, refreshToken);
 
             // Đăng nhập thành công, chuyển hướng về trang chủ
             const destination = location.state?.from;

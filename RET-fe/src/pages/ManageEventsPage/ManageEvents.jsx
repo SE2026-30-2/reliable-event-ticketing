@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../contexts/useAuth'
 import { manageEventService, managementError } from '../../services/manageEventService'
 import './manage-events.css'
 
@@ -170,7 +170,7 @@ export default function ManageEvents({ preview = false }) {
             const count = preview ? event : stats[event.eventId]
             return <li key={event.eventId} className={editing?.eventId === event.eventId ? 'selected' : ''}>
               <div className={`manage-thumbnail art-${index % 6}`}>{event.bannerUrl ? <img src={event.bannerUrl} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} /> : <span aria-hidden="true">{event.art || '♫'}</span>}</div>
-              <div className="manage-event-info"><h2>{event.name}</h2><p><time dateTime={event.startsAt}>{new Date(event.startsAt).toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' })}</time><span className="manage-dot">•</span>{event.venue || 'Chưa có địa điểm'}</p><p className="manage-sales"><Icon name="ticket" />{count ? `${number.format(count.sold)} / ${number.format(count.quota)} vé đã bán` : 'Chưa tải được số liệu vé'}</p></div>
+              <div className="manage-event-info"><h2><Link to={`${preview ? '/manage/preview/events' : '/manage/events'}/${encodeURIComponent(event.eventId)}`}>{event.name}</Link></h2><p><time dateTime={event.startsAt}>{new Date(event.startsAt).toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' })}</time><span className="manage-dot">•</span>{event.venue || 'Chưa có địa điểm'}</p><p className="manage-sales"><Icon name="ticket" />{count ? `${number.format(count.sold)} / ${number.format(count.quota)} vé đã bán` : 'Chưa tải được số liệu vé'}</p></div>
               <span className={`manage-status ${event.status.toLowerCase()}`}>{event.status}</span>
               {['DRAFT', 'PUBLISHED'].includes(event.status) && <details className="manage-row-menu"><summary aria-label={`Thao tác với ${event.name}`}>•••</summary><div><button type="button" disabled={busy} onClick={(e) => { e.currentTarget.closest('details').open = false; openForm(event) }}>Chỉnh sửa{event.status === 'DRAFT' ? ' / Xuất bản' : ''}</button><button type="button" className="danger" disabled={busy} onClick={(e) => { e.currentTarget.closest('details').open = false; setCancelTarget(event) }}>Hủy sự kiện</button></div></details>}
             </li>

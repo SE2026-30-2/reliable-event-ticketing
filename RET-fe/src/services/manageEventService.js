@@ -25,4 +25,22 @@ export const manageEventService = {
   create: (body) => client.post('/api/event', body).then(({ data }) => data),
   update: (id, body) => client.patch(`/api/event/${encodeURIComponent(id)}`, body).then(({ data }) => data),
   ticketTypes: (id, signal) => client.get(`/api/event/${encodeURIComponent(id)}/ticket-types`, { signal }).then(({ data }) => data),
+  detail: (id, signal) => client.get(`/api/event/${encodeURIComponent(id)}`, { signal }).then(({ data }) => data),
+  report: (id, signal) => client.get(`/api/manage/events/${encodeURIComponent(id)}/report`, { signal }).then(({ data }) => data),
+  createTicketType: (id, body) => client.post(`/api/event/${encodeURIComponent(id)}/ticket-types`, body).then(({ data }) => data),
+  coupons: (id, signal) => client.get(`/api/manage/events/${encodeURIComponent(id)}/coupons`, { signal }).then(({ data }) => data),
+  createCoupon: (id, body) => client.post(`/api/manage/events/${encodeURIComponent(id)}/coupons`, body).then(({ data }) => data),
+  setCouponActive: (id, couponId, active) => client.patch(`/api/manage/events/${encodeURIComponent(id)}/coupons/${encodeURIComponent(couponId)}`, { active }).then(({ data }) => data),
+  inviteGuests: (id, body) => client.post(`/api/manage/events/${encodeURIComponent(id)}/guests`, body).then(({ data }) => data),
+  tickets: (id, page, signal) => client.get(`/api/event/${encodeURIComponent(id)}/tickets`, { params: { page, size: 20 }, signal }).then(({ data }) => data),
+  updateTicketStatus: (id, body) => client.patch(`/api/ticket/${encodeURIComponent(id)}/status`, body).then(({ data }) => data),
+  devices: (id, signal) => client.get('/api/checkin/devices', { params: { eventId: id }, signal }).then(({ data }) => data),
+  createDevice: (id, label) => client.post('/api/checkin/devices', { eventId: id, label }).then(({ data }) => data),
+  revokeDevice: (id) => client.patch(`/api/checkin/devices/${encodeURIComponent(id)}/revoke`).then(({ data }) => data),
+  checkinStats: (id, signal) => client.get(`/api/checkin/events/${encodeURIComponent(id)}/stats`, { signal }).then(({ data }) => data),
+  timeline: (id, bucketMinutes, signal) => client.get(`/api/checkin/events/${encodeURIComponent(id)}/timeline`, { params: { bucketMinutes }, signal }).then(({ data }) => data),
+  exportCsv: (id, kind) => {
+    if (!['attendees', 'payments'].includes(kind)) throw new Error('Loại báo cáo không hợp lệ.');
+    return client.get(`/api/manage/events/${encodeURIComponent(id)}/${kind}.csv`, { responseType: 'blob' }).then(({ data }) => data);
+  },
 }

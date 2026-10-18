@@ -180,3 +180,4 @@ image_support/
 docker-compose.yml/
 README.md/
 .github/
+playwright.config.ts/

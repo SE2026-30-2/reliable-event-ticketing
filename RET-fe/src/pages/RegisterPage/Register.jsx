@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 import { authService } from '../../services/authService';
 
 export default function Register() {
@@ -34,8 +34,9 @@ export default function Register() {
             try {
                 const loginData = await authService.login({ email, password });
                 const token = loginData?.token || loginData?.accessToken || loginData?.access_token;
+                const refreshToken = loginData?.refreshToken;
                 const userData = loginData?.user || { email, fullName };
-                login(userData, token);
+                login(userData, token, refreshToken);
             } catch {
                 // Nếu backend không tự cấp token sau đăng ký thì chuyển hướng qua trang login
                 navigate('/login');
