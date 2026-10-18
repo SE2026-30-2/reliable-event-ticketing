@@ -1,6 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-
-const AuthContext = createContext(null);
+import { useState, useEffect } from 'react';
+import { AuthContext } from './auth-context';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(() => {
@@ -47,12 +46,4 @@ export function AuthProvider({ children }) {
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth phải được sử dụng bên trong AuthProvider');
-    }
-    return context;
 }
