@@ -27,6 +27,7 @@ export default function Header() {
           </Link>
 
           <nav className="hidden md:flex items-center space-x-8 text-[15px] font-semibold">
+            <Link to="/checkin" className="text-slate-600 hover:text-slate-900 transition-colors py-2">Soát vé</Link>
             <Link to="/home" className="text-[#4353ff] relative py-2">
               Trang chủ
               <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#4353ff] rounded-full"></span>
@@ -37,12 +38,12 @@ export default function Header() {
             >
               Quản lý sự kiện
             </Link>
-            <a
+            {user?.roles?.includes("ADMIN") ? <Link to="/admin/users" className="text-slate-600 hover:text-slate-900 transition-colors py-2">Quản trị người dùng</Link> : <a
               className="text-slate-600 hover:text-slate-900 transition-colors py-2"
               href="#history"
             >
               Lịch sử đặt vé
-            </a>
+            </a>}
           </nav>
         </div>
 

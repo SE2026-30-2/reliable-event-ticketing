@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Generated build caches, reports and local helper files
+.vite/
+.cache/
+*.tsbuildinfo
+/tmp/
+/temp/
+/coverage/
+/.nyc_output/
+/playwright-report/
+/blob-report/
+/test-results/
+/playwright/.cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -23,11 +36,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Track the screen 14 fix report despite the repository-wide docs ignore.
-!/docs/
-/docs/*
-!/docs/screen-14-fixes-2026-10-17.md
-!/docs/screen-15-event-management.md
-/tmp/
-docs/
-tests/
+# Local documentation and tests are excluded from the runtime source upload.
+/docs/
+/SCREEN*.md
+/tests/
+/playwright*.config.*

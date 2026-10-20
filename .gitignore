@@ -156,6 +156,33 @@ k8s/*.yaml
 
 # Application specific
 tmp/
+temp/
+
+# Dependencies, generated frontend bundles and local caches
+node_modules/
+dist/
+dist-ssr/
+.cache/
+.npm/
+.vite/
+*.tsbuildinfo
+
+# Generated test reports and browser artifacts
+coverage/
+.nyc_output/
+playwright-report/
+blob-report/
+test-results/
+playwright/.cache/
+
+# Local helper environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Local repository automation is excluded from the runtime source upload.
+/.github/
 
 # Docker volume data (runtime data, must not be versioned)
 volume-data/
@@ -165,6 +192,11 @@ backend/order-service/postgres-data/
 
 # Environment variables
 .env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.template
 
 # Keep empty directories
 !.gitkeep
@@ -177,7 +209,7 @@ docs/
 EventHub_18_man_hinh_rieng/
 frontend_old/
 image_support/
-docker-compose.yml/
+/docker-compose.yml
 README.md/
-.github/
+
 playwright.config.ts/
