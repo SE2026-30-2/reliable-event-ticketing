@@ -7,6 +7,7 @@ import PrivateRoute from "./PrivateRoute";
 import Profile from "../pages/ProfilePage/Profile";
 import ManageEvents from "../pages/ManageEventsPage/ManageEvents";
 import EventManagement from "../pages/EventManagementPage/EventManagement";
+import EventDetail from "../pages/EventDetailPage/EventDetail";
 
 // Import thêm các trang khác sau này ở đây
 
@@ -47,6 +48,7 @@ export default function AppRoutes() {
           </PrivateRoute>
         }
       />
+        <Route path="/event/:id" element={<EventDetail />} />
     </Routes>
   );
 }
