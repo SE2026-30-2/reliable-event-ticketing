@@ -98,7 +98,7 @@ export default function EventCard({ event }) {
             </span>
                     </div>
                     <Link
-                        to={`/event/${eventId}`}
+                        to={`/events/${eventId}`}
                         className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold text-[#4353ff] border border-indigo-200 rounded-lg hover:bg-[#4353ff] hover:text-white transition-all"
                     >
                         <span>Xem chi tiết</span>
