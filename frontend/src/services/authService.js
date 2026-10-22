@@ -1,9 +1,8 @@
-import axiosClient, { USER_SERVICE_URL } from "./axiosClient";
+import { userClient } from "./axiosClient";
 
 export const authService = {
   login: async (credentials) => {
-    return axiosClient.post("/api/user/login", credentials, {
-      baseURL: USER_SERVICE_URL,
+    return userClient.post("/api/user/login", credentials, {
       skipAuth: true,
     });
   },
@@ -13,8 +12,7 @@ export const authService = {
       throw new Error("Máy chủ chưa trả về access token hợp lệ.");
     }
     // Fetch the authoritative profile with the new token before saving the session.
-    const user = await axiosClient.get("/api/user/me", {
-      baseURL: USER_SERVICE_URL,
+    const user = await userClient.get("/api/user/me", {
       accessToken: tokens.accessToken,
       timeout: 15000,
     });
@@ -24,8 +22,7 @@ export const authService = {
     return { ...tokens, user };
   },
   register: async (userData) => {
-    return axiosClient.post("/api/user/register", userData, {
-      baseURL: USER_SERVICE_URL,
+    return userClient.post("/api/user/register", userData, {
       skipAuth: true,
     });
   },

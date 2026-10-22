@@ -14,6 +14,7 @@ async function submitLogin(page, email, password) {
 
 async function mockAuth(page, { profileStatus = 200, user = profile } = {}) {
   const calls = [];
+  await page.route(/\/api\/event(?:\?|$)/, (route) => route.fulfill({ json: [] }));
   await page.route('http://localhost:8087/api/user/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204 });
@@ -100,6 +101,31 @@ test('profile request uses the newly issued token rather than a stale stored tok
   await expect(page).toHaveURL(/\/home$/);
   expect(calls[0].authorization).toBeUndefined();
   expect(calls[1].authorization).toBe('Bearer new-access-token');
+});
+
+test('event cards and both detail routes load the event and ticket types after merging main', async ({ page }) => {
+  await mockAuth(page);
+  const event = {
+    eventId: 'merge-test-event', name: 'Merge Test Concert', status: 'PUBLISHED',
+    venue: 'Test Venue', description: 'Test description',
+    startsAt: '2026-11-01T12:00:00Z', endsAt: '2026-11-01T15:00:00Z',
+  };
+  await page.route(/\/api\/event(?:\?|$)/, (route) => route.fulfill({ json: { content: [event] } }));
+  await page.route('**/api/event/merge-test-event', (route) => route.fulfill({ json: event }));
+  await page.route('**/api/event/merge-test-event/ticket-types', (route) => route.fulfill({ json: [
+    { ticketTypeId: 'vip', name: 'VIP from API', priceCents: 12000000, remaining: 12, bundleSize: 1 },
+  ] }));
+  await page.goto('/login');
+  await submitLogin(page, profile.email, 'ExamplePassword123!');
+  await page.getByRole('link', { name: 'Xem chi tiết', exact: true }).click();
+  await expect(page).toHaveURL(/\/events\/merge-test-event$/);
+  for (const path of ['/events/merge-test-event', '/event/merge-test-event']) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: event.name, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'VIP from API', exact: true })).toBeVisible();
+    await expect(page.getByText('Còn 12 vé', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
+  }
 });
 
 test('real backend: admin can log in and load screen 16 without injected storage', async ({ page }) => {
