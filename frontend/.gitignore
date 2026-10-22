@@ -47,3 +47,7 @@ dist-ssr
 !/tests/
 /tests/*
 !/tests/auth-login.spec.mjs
+
+# Keep the device administration regression suite reviewable.
+!/playwright.screen17.config.mjs
+!/tests/screen17.spec.mjs

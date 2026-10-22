@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:screen17:browser": "playwright test --config playwright.screen17.config.mjs",
     "test:auth:browser": "playwright test --config playwright.auth.config.mjs",
     "test:screen13": "node --test tests/screen13.test.mjs",
     "test:screen13:browser": "playwright test --config playwright.screen13.config.mjs",

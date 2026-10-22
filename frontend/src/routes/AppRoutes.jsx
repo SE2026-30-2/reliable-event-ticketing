@@ -15,6 +15,7 @@ import PaymentGateway from "../pages/PaymentPage/PaymentGateway";
 
 const Checkin = lazy(() => import("../pages/CheckinPage/Checkin"));
 const AdminUsers = lazy(() => import("../pages/AdminUsersPage/AdminUsers"));
+const AdminDevices = lazy(() => import("../pages/AdminDevicesPage/AdminDevices"));
 
 // Import thêm các trang khác sau này ở đây
 
@@ -28,6 +29,8 @@ export default function AppRoutes() {
       <Route path="/event/:eventId" element={<EventDetail />} />
       <Route path="/checkin" element={<Suspense fallback={<p role="status">Đang mở màn soát vé…</p>}><Checkin /></Suspense>} />
       <Route path="/admin/users" element={<PrivateRoute><Suspense fallback={<p role="status">Đang mở quản trị người dùng…</p>}><AdminUsers /></Suspense></PrivateRoute>} />
+      <Route path="/admin/devices" element={<PrivateRoute><Suspense fallback={<p role="status">Đang mở quản trị thiết bị…</p>}><AdminDevices /></Suspense></PrivateRoute>} />
+      {import.meta.env.DEV && <Route path="/admin/devices/preview" element={<Suspense fallback={<p role="status">Đang mở bản xem thử…</p>}><AdminDevices preview /></Suspense>} />}
       {import.meta.env.DEV && <Route path="/admin/users/preview" element={<Suspense fallback={<p role="status">Đang mở bản xem thử…</p>}><AdminUsers preview /></Suspense>} />}
       <Route
         path="/manage"
