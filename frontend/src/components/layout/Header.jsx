@@ -20,7 +20,7 @@ export default function Header() {
       <header className="bg-white border-b border-slate-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap gap-y-3 items-center justify-between">
           {/* Brand Logo & Navigation */}
-          <div className="flex items-center space-x-12">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-8 gap-y-3">
             <Link to="/home" className="flex items-center space-x-2.5 group">
               <div className="w-9 h-9 rounded-xl bg-[#4353ff] flex items-center justify-center text-white shadow-md shadow-indigo-200 transform -rotate-12 group-hover:rotate-0 transition-transform">
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -32,7 +32,7 @@ export default function Header() {
             </span>
             </Link>
 
-            <nav className="hidden md:flex items-center space-x-8 text-[15px] font-semibold">
+            <nav className="hidden md:flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] font-semibold">
               <Link to="/checkin" className={`relative py-2 transition-colors ${isActive('/checkin') ? 'text-[#4353ff]' : 'text-slate-600 hover:text-slate-900'}`}>Soát vé</Link>
               {/* Trang chủ - Ai cũng thấy */}
               <Link
@@ -61,6 +61,7 @@ export default function Header() {
               </Link>
 
               {/* Chỉ ADMIN mới thấy Quản lý người dùng */}
+              {isAdmin && <Link to="/admin/devices" className={`relative py-2 transition-colors ${isActive('/admin/devices') ? 'text-[#4353ff]' : 'text-slate-600 hover:text-slate-900'}`}>Quản trị thiết bị</Link>}
               {isAdmin && (
                   <Link
                       to="/admin/users"
@@ -131,6 +132,7 @@ export default function Header() {
               <span>Đăng xuất</span>
             </button>
           </div>
+          {isAdmin && <nav aria-label="Quản trị hệ thống" className="flex w-full gap-4 text-sm font-semibold text-indigo-600 md:hidden"><Link to="/admin/users">Quản trị người dùng</Link><Link to="/admin/devices">Quản trị thiết bị</Link></nav>}
         </div>
       </header>
   );
