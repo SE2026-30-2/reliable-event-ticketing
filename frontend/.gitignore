@@ -41,3 +41,9 @@ dist-ssr
 /SCREEN*.md
 /tests/
 /playwright*.config.*
+
+# Keep the login regression test and its standalone runner reviewable.
+!/playwright.auth.config.mjs
+!/tests/
+/tests/*
+!/tests/auth-login.spec.mjs

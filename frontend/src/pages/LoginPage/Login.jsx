@@ -21,14 +21,8 @@ export default function Login() {
 
         try {
             // Gọi API đăng nhập thông qua authService
-            const data = await authService.login({ email, password });
-
-            // Hỗ trợ linh hoạt các kiểu response từ backend: { token, user }, { accessToken, user }, ...
-            const token = data?.token || data?.accessToken || data?.access_token;
-            const refreshToken = data?.refreshToken;
-            const userData = data?.user || { email };
-
-            login(userData, token, refreshToken);
+            const { user, accessToken, refreshToken } = await authService.loginWithProfile({ email, password });
+            login(user, accessToken, refreshToken);
 
             // Đăng nhập thành công, chuyển hướng về trang chủ
             const destination = location.state?.from;

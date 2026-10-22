@@ -21,10 +21,16 @@ export const eventService = {
      * Lấy chi tiết 1 sự kiện
      * GET http://localhost:8091/api/event/{id}
      */
-    getEventById: async (eventId) => {
-        const data = await axiosClient.get(`/api/event/${eventId}`, {
+    getEventById: async (eventId, { signal } = {}) => {
+        const data = await axiosClient.get(`/api/event/${encodeURIComponent(eventId)}`, {
             baseURL: TICKETING_SERVICE_URL,
+            signal,
+            timeout: 15000,
         });
         return data;
     },
+    getTicketTypes: (eventId, { signal } = {}) => axiosClient.get(
+        `/api/event/${encodeURIComponent(eventId)}/ticket-types`,
+        { baseURL: TICKETING_SERVICE_URL, signal, timeout: 15000 },
+    ),
 };

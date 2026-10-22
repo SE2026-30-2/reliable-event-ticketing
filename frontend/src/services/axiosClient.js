@@ -19,7 +19,7 @@ axiosClient.interceptors.request.use(
       config.headers.delete("Authorization");
       return config;
     }
-    const token = localStorage.getItem("access_token");
+    const token = config.accessToken ?? localStorage.getItem("access_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
