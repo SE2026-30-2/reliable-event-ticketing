@@ -57,6 +57,41 @@ test('profile failure does not persist a partial login session', async ({ page }
   await expect(page).toHaveURL(/\/login$/);
 });
 
+for (const source of ['/admin/users', '/checkin']) {
+  test(`about page keeps the signed-in account after navigation from ${source}`, async ({ page }) => {
+    await mockAuth(page);
+    await page.route('**/api/manage/events', (route) => route.fulfill({ json: [] }));
+    await page.route('**/.well-known/jwks.json', (route) => route.fulfill({ status: 503 }));
+    await page.goto('/login');
+    await submitLogin(page, profile.email, 'ExamplePassword123!');
+    await expect(page).toHaveURL(/\/home$/);
+    await page.goto(source);
+    // Check-in reaches the About link through event management.
+    if (source === '/checkin') {
+      await page.getByRole('link', { name: 'Quản lý sự kiện', exact: true }).click();
+    }
+    await page.getByRole('link', { name: 'Về chúng tôi', exact: true }).click();
+    await expect(page).toHaveURL(/\/#features$/);
+    const header = page.locator('header');
+    await expect(header.getByRole('link', { name: /Test Admin/ })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Đăng nhập', exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(header.getByRole('link', { name: /Test Admin/ })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('access_token'))).toBe('new-access-token');
+    await header.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+    await expect(header.getByRole('link', { name: 'Đăng nhập', exact: true })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Đăng ký', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
+  });
+}
+
+test('about page shows login and registration for guests', async ({ page }) => {
+  await page.goto('/#features');
+  const header = page.locator('header');
+  await expect(header.getByRole('link', { name: 'Đăng nhập', exact: true })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Đăng ký', exact: true })).toBeVisible();
+});
+
 test('profile request uses the newly issued token rather than a stale stored token', async ({ page }) => {
   const calls = await mockAuth(page);
   await page.goto('/login');

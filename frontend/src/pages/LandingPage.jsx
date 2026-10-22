@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Header from '../components/layout/Header';
+import { useAuth } from '../contexts/useAuth';
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
   // State mô phỏng tương tác quét QR trực tiếp
   const [ticketType, setTicketType] = useState('VIP');
   const [scanStatus, setScanStatus] = useState('idle'); // 'idle' | 'scanning' | 'success' | 'warning'
@@ -119,7 +122,7 @@ export default function LandingPage() {
   return (
       <div className="min-h-screen bg-[#f8faff] text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
         {/* HEADER */}
-        <header className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-100">
+        {isAuthenticated ? <Header /> : <header className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-100">
           <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
             <a className="flex items-center gap-3 group" href="#home">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
@@ -156,7 +159,7 @@ export default function LandingPage() {
               </Link>
             </div>
           </div>
-        </header>
+        </header>}
 
       {/* HERO SECTION */}
       <section 
