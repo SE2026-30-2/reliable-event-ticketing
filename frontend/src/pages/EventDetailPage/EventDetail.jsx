@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom"; // Bổ sung useNavigate
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
 import { eventService } from "../../services/eventService.js";
 
 export default function EventDetail() {
     const { id } = useParams();
+    const navigate = useNavigate(); // Hook chuyển trang
+
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -59,12 +61,37 @@ export default function EventDetail() {
         });
     };
 
+    // Hàm xử lý khi bấm Đặt vé & Thanh toán
+    const handleBooking = () => {
+        if (!fullName.trim() || !email.trim()) {
+            alert("Vui lòng nhập đầy đủ Họ tên và Email người nhận vé!");
+            return;
+        }
+
+        const basePrice = selectedTicket === "VIP" ? 2500000 : 1200000;
+        const discountRate = isCouponApplied ? 0.1 : 0;
+        const pricePerTicket = basePrice * (1 - discountRate);
+
+        // Chuyển sang trang Checkout và đính kèm state
+        navigate(`/checkout/${id}`, {
+            state: {
+                ticketType: selectedTicket,
+                packageInfo: selectedTicket === "VIP" ? "Gói 2 ngày" : "Vé thường",
+                quantity,
+                pricePerTicket,
+                customerName: fullName,
+                customerEmail: email,
+                couponCode: isCouponApplied ? coupon : "",
+            },
+        });
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between">
                 <Header />
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#4353ff] border-t-transparent"></div>
                 </div>
                 <Footer />
             </div>
@@ -80,7 +107,7 @@ export default function EventDetail() {
                     <p className="text-slate-500 mb-6">{error || "Không tìm thấy thông tin sự kiện yêu cầu."}</p>
                     <Link
                         to="/home"
-                        className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+                        className="px-6 py-2.5 rounded-xl bg-[#4353ff] text-white font-semibold hover:bg-indigo-700 transition"
                     >
                         Quay lại trang chủ
                     </Link>
@@ -188,7 +215,6 @@ export default function EventDetail() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     {/* Left Column: Details & Tabs */}
                     <section className="lg:col-span-7 space-y-6">
-                        {/* Navigation Tabs - Đã gắn onClick và active state */}
                         <nav className="flex items-center gap-8 border-b border-slate-200 text-sm font-semibold text-slate-500">
                             <button
                                 type="button"
@@ -235,8 +261,6 @@ export default function EventDetail() {
                                 Điều khoản
                             </button>
                         </nav>
-
-                        {/* NỘI DUNG THAY ĐỔI THEO TAB */}
 
                         {/* 1. Tab: Tổng quan */}
                         {activeTab === "overview" && (
@@ -468,6 +492,13 @@ export default function EventDetail() {
                                                 <span className="text-xs text-slate-400">Còn lại: </span>
                                                 <span className="text-xs font-bold text-slate-700">350</span>
                                             </div>
+                                            {selectedTicket === "STD" && (
+                                                <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center">
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                                                    </svg>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -531,13 +562,15 @@ export default function EventDetail() {
                                     </div>
                                     <div className="text-right space-y-1">
                                         <div className="text-xs text-slate-400">
-                                            Tổng tiền: <span className="font-medium text-slate-600 line-through">2.500.000đ</span>
+                                            Tổng gốc: <span className="font-medium text-slate-600 line-through">{((selectedTicket === "VIP" ? 2500000 : 1200000) * quantity).toLocaleString("vi-VN")}đ</span>
                                         </div>
-                                        <div className="text-xs text-emerald-600 font-semibold flex items-center justify-end gap-1">
-                                            Giảm giá (-10%): <span>250.000đ</span>
-                                        </div>
+                                        {isCouponApplied && (
+                                            <div className="text-xs text-emerald-600 font-semibold flex items-center justify-end gap-1">
+                                                Giảm giá (-10%): <span>{((selectedTicket === "VIP" ? 2500000 : 1200000) * quantity * 0.1).toLocaleString("vi-VN")}đ</span>
+                                            </div>
+                                        )}
                                         <div className="text-xl font-extrabold text-[#4353ff] tracking-tight">
-                                            {(2250000 * quantity).toLocaleString("vi-VN")}đ
+                                            {(((selectedTicket === "VIP" ? 2500000 : 1200000) * (isCouponApplied ? 0.9 : 1)) * quantity).toLocaleString("vi-VN")}đ
                                         </div>
                                     </div>
                                 </div>
@@ -572,7 +605,9 @@ export default function EventDetail() {
                                     </div>
                                 </div>
 
+                                {/* Nút đặt vé đã được gắn onClick={handleBooking} */}
                                 <button
+                                    onClick={handleBooking}
                                     className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#4353ff] to-indigo-600 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all group"
                                     type="button"
                                 >

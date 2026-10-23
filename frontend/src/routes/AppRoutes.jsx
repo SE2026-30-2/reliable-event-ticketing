@@ -8,6 +8,7 @@ import Profile from "../pages/ProfilePage/Profile";
 import ManageEvents from "../pages/ManageEventsPage/ManageEvents";
 import EventManagement from "../pages/EventManagementPage/EventManagement";
 import EventDetail from "../pages/EventDetailPage/EventDetail";
+import Checkout from "../pages/CheckoutPage/Checkout";
 
 // Import thêm các trang khác sau này ở đây
 
@@ -49,6 +50,14 @@ export default function AppRoutes() {
         }
       />
         <Route path="/event/:id" element={<EventDetail />} />
+        <Route
+            path="/checkout/:id"
+            element={
+                <PrivateRoute>
+                    <Checkout />
+                </PrivateRoute>
+            }
+        />
     </Routes>
   );
 }
