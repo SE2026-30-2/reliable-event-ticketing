@@ -1,56 +1,46 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom"; // Bổ sung useNavigate
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
 import { eventService } from "../../services/eventService.js";
 
-const money = (cents) => new Intl.NumberFormat('vi-VN', {
-    style: 'currency', currency: 'VND',
-}).format(cents / 100);
-
 export default function EventDetail() {
-    const { eventId } = useParams();
-    return <EventContent key={eventId} eventId={eventId} />;
-}
+    const { id } = useParams();
+    const navigate = useNavigate(); // Hook chuyển trang
 
-function EventContent({ eventId }) {
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState('overview');
-    const [tickets, setTickets] = useState(null);
-    const [ticketError, setTicketError] = useState('');
-    const [attempt, setAttempt] = useState(0);
+    const [error, setError] = useState("");
+
+    // State quản lý Tab đang chọn (overview | program | venue | terms)
+    const [activeTab, setActiveTab] = useState("overview");
+
+    // States hỗ trợ đặt vé
+    const [selectedTicket, setSelectedTicket] = useState("VIP");
+    const [quantity, setQuantity] = useState(1);
+    const [coupon, setCoupon] = useState("EVENT10");
+    const [isCouponApplied, setIsCouponApplied] = useState(true);
+    const [fullName, setFullName] = useState("");
+    const [email, setEmail] = useState("");
 
     useEffect(() => {
-        const controller = new AbortController();
-        const options = { signal: controller.signal };
-        eventService.getEventById(eventId, options).then((data) => {
-            if (!controller.signal.aborted) {
-                if (data?.eventId) setEvent(data);
-                else setError('Không tìm thấy sự kiện.');
+        const fetchEventDetail = async () => {
+            setLoading(true);
+            try {
+                const data = await eventService.getEventById(id);
+                setEvent(data);
+            } catch (err) {
+                console.error("Lỗi khi tải thông tin sự kiện:", err);
+                setError("Không thể tải thông tin sự kiện. Vui lòng thử lại sau.");
+            } finally {
+                setLoading(false);
             }
-        }).catch(() => {
-            if (!controller.signal.aborted) setError('Không thể tải thông tin sự kiện. Vui lòng thử lại sau.');
-        }).finally(() => {
-            if (!controller.signal.aborted) setLoading(false);
-        });
-        eventService.getTicketTypes(eventId, options).then((data) => {
-            if (!controller.signal.aborted) setTickets(data);
-        }).catch(() => {
-            if (!controller.signal.aborted) setTicketError('Không thể tải danh sách loại vé. Vui lòng thử lại.');
-        });
-        return () => controller.abort();
-    }, [eventId, attempt]);
+        };
 
-    function retry() {
-        setEvent(null);
-        setLoading(true);
-        setError('');
-        setTickets(null);
-        setTicketError('');
-        setAttempt((value) => value + 1);
-    }
+        if (id) {
+            fetchEventDetail();
+        }
+    }, [id]);
 
     const formatDate = (dateString) => {
         if (!dateString) return "";
@@ -71,12 +61,37 @@ function EventContent({ eventId }) {
         });
     };
 
+    // Hàm xử lý khi bấm Đặt vé & Thanh toán
+    const handleBooking = () => {
+        if (!fullName.trim() || !email.trim()) {
+            alert("Vui lòng nhập đầy đủ Họ tên và Email người nhận vé!");
+            return;
+        }
+
+        const basePrice = selectedTicket === "VIP" ? 2500000 : 1200000;
+        const discountRate = isCouponApplied ? 0.1 : 0;
+        const pricePerTicket = basePrice * (1 - discountRate);
+
+        // Chuyển sang trang Checkout và đính kèm state
+        navigate(`/checkout/${id}`, {
+            state: {
+                ticketType: selectedTicket,
+                packageInfo: selectedTicket === "VIP" ? "Gói 2 ngày" : "Vé thường",
+                quantity,
+                pricePerTicket,
+                customerName: fullName,
+                customerEmail: email,
+                couponCode: isCouponApplied ? coupon : "",
+            },
+        });
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between">
                 <Header />
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#4353ff] border-t-transparent"></div>
                 </div>
                 <Footer />
             </div>
@@ -90,10 +105,9 @@ function EventContent({ eventId }) {
                 <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
                     <h2 className="text-2xl font-bold text-slate-800 mb-2">Sự kiện không tồn tại</h2>
                     <p className="text-slate-500 mb-6">{error || "Không tìm thấy thông tin sự kiện yêu cầu."}</p>
-                    <button type="button" onClick={retry} className="mb-4 font-semibold text-indigo-600">Thử lại</button>
                     <Link
                         to="/home"
-                        className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+                        className="px-6 py-2.5 rounded-xl bg-[#4353ff] text-white font-semibold hover:bg-indigo-700 transition"
                     >
                         Quay lại trang chủ
                     </Link>
@@ -201,7 +215,6 @@ function EventContent({ eventId }) {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     {/* Left Column: Details & Tabs */}
                     <section className="lg:col-span-7 space-y-6">
-                        {/* Navigation Tabs - Đã gắn onClick và active state */}
                         <nav className="flex items-center gap-8 border-b border-slate-200 text-sm font-semibold text-slate-500">
                             <button
                                 type="button"
@@ -248,8 +261,6 @@ function EventContent({ eventId }) {
                                 Điều khoản
                             </button>
                         </nav>
-
-                        {/* NỘI DUNG THAY ĐỔI THEO TAB */}
 
                         {/* 1. Tab: Tổng quan */}
                         {activeTab === "overview" && (
@@ -401,19 +412,222 @@ function EventContent({ eventId }) {
                         )}
                     </section>
 
+                    {/* Right Column: Sticky Booking Widget */}
                     <aside className="lg:col-span-5">
-                        <section className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-100 shadow-xl shadow-slate-100/70 space-y-6 sticky top-28">
-                            <h2 className="text-xl font-bold text-slate-900">Thông tin vé</h2>
-                            {ticketError ? <div role="alert" className="text-rose-600">{ticketError} <button type="button" className="font-semibold underline" onClick={retry}>Thử lại</button></div>
-                                : tickets === null ? <p role="status" className="text-slate-500">Đang tải thông tin vé…</p>
-                                    : tickets.length === 0 ? <p className="text-slate-500">Sự kiện chưa có loại vé nào được mở bán.</p>
-                                        : <ul className="grid gap-4">{tickets.map((ticket) => <li key={ticket.ticketTypeId} className="rounded-2xl border border-slate-200 p-5">
-                                            <h3 className="font-bold">{ticket.name}</h3>
-                                            <p className="mt-2 text-lg font-bold text-indigo-600">{money(ticket.priceCents)}</p>
-                                            <p className="mt-2 text-sm text-slate-500">{ticket.remaining > 0 ? `Còn ${ticket.remaining} vé` : 'Hết vé'}</p>
-                                            {ticket.bundleSize > 1 && <p className="mt-1 text-sm text-slate-500">Gói {ticket.bundleSize} vé</p>}
-                                        </li>)}</ul>}
-                        </section>
+                        <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-100 shadow-xl shadow-slate-100/70 space-y-6 sticky top-28">
+                            <div className="flex items-center gap-2.5 pb-2">
+                                <div className="w-8 h-8 rounded-xl bg-[#4353ff] text-white flex items-center justify-center shadow-sm">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                    </svg>
+                                </div>
+                                <h3 className="text-base font-extrabold text-slate-900">Chọn loại vé</h3>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div
+                                    onClick={() => setSelectedTicket("VIP")}
+                                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                        selectedTicket === "VIP"
+                                            ? "border-[#4353ff] bg-indigo-50/20"
+                                            : "border-slate-200 hover:border-slate-300"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-[#4353ff] text-white flex items-center justify-center">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-slate-900">VIP</span>
+                                                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Trọn gói</span>
+                                                </div>
+                                                <div className="text-sm font-extrabold text-[#4353ff] mt-0.5">2.500.000đ</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                                <span className="text-xs text-slate-400">Còn lại: </span>
+                                                <span className="text-xs font-bold text-emerald-600">120</span>
+                                            </div>
+                                            {selectedTicket === "VIP" && (
+                                                <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center">
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    onClick={() => setSelectedTicket("STD")}
+                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                        selectedTicket === "STD"
+                                            ? "border-2 border-[#4353ff] bg-indigo-50/20"
+                                            : "border-slate-200 hover:border-slate-300 bg-white"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-slate-900">Standard</span>
+                                                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Vé thường</span>
+                                                </div>
+                                                <div className="text-sm font-extrabold text-slate-800 mt-0.5">1.200.000đ</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                                <span className="text-xs text-slate-400">Còn lại: </span>
+                                                <span className="text-xs font-bold text-slate-700">350</span>
+                                            </div>
+                                            {selectedTicket === "STD" && (
+                                                <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center">
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100 space-y-2">
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                                            <svg className="w-4 h-4 text-[#4353ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                            </svg>
+                                        </span>
+                                        <input
+                                            className="w-full pl-9 pr-3 py-2 text-xs uppercase tracking-wider font-bold bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            type="text"
+                                            value={coupon}
+                                            onChange={(e) => setCoupon(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setIsCouponApplied(true)}
+                                        className="px-5 py-2 rounded-xl bg-[#4353ff] hover:bg-indigo-700 text-white font-semibold text-xs transition-colors"
+                                        type="button"
+                                    >
+                                        Áp dụng
+                                    </button>
+                                </div>
+                                {isCouponApplied && (
+                                    <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                                        </svg>
+                                        Coupon hợp lệ! Giảm 10%
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-4 pt-1">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Thông tin đặt vé</h4>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-xs font-semibold text-slate-600 block mb-1.5">Số lượng</span>
+                                        <div className="flex items-center border border-slate-200 rounded-xl bg-white p-1">
+                                            <button
+                                                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 font-bold"
+                                                type="button"
+                                            >
+                                                -
+                                            </button>
+                                            <span className="w-9 text-center text-xs font-bold text-slate-800">{quantity}</span>
+                                            <button
+                                                onClick={() => setQuantity(quantity + 1)}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 font-bold"
+                                                type="button"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="text-right space-y-1">
+                                        <div className="text-xs text-slate-400">
+                                            Tổng gốc: <span className="font-medium text-slate-600 line-through">{((selectedTicket === "VIP" ? 2500000 : 1200000) * quantity).toLocaleString("vi-VN")}đ</span>
+                                        </div>
+                                        {isCouponApplied && (
+                                            <div className="text-xs text-emerald-600 font-semibold flex items-center justify-end gap-1">
+                                                Giảm giá (-10%): <span>{((selectedTicket === "VIP" ? 2500000 : 1200000) * quantity * 0.1).toLocaleString("vi-VN")}đ</span>
+                                            </div>
+                                        )}
+                                        <div className="text-xl font-extrabold text-[#4353ff] tracking-tight">
+                                            {(((selectedTicket === "VIP" ? 2500000 : 1200000) * (isCouponApplied ? 0.9 : 1)) * quantity).toLocaleString("vi-VN")}đ
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Thông tin người nhận vé</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                Họ tên <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                className="w-full text-xs font-medium px-3 py-2 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                type="text"
+                                                placeholder="Nguyễn Văn A"
+                                                value={fullName}
+                                                onChange={(e) => setFullName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                Email <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                className="w-full text-xs font-medium px-3 py-2 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                type="email"
+                                                placeholder="nguyenvana@example.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Nút đặt vé đã được gắn onClick={handleBooking} */}
+                                <button
+                                    onClick={handleBooking}
+                                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#4353ff] to-indigo-600 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all group"
+                                    type="button"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                    </svg>
+                                    <span>Đặt vé &amp; Thanh toán</span>
+                                    <svg className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                    </svg>
+                                </button>
+
+                                <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400 pt-1">
+                                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                                    </svg>
+                                    <span>Thanh toán an toàn • Hỗ trợ nhiều phương thức</span>
+                                </div>
+                            </div>
+                        </div>
                     </aside>
                 </div>
             </main>

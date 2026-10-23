@@ -8,6 +8,7 @@ import Profile from "../pages/ProfilePage/Profile";
 import ManageEvents from "../pages/ManageEventsPage/ManageEvents";
 import EventManagement from "../pages/EventManagementPage/EventManagement";
 import EventDetail from "../pages/EventDetailPage/EventDetail";
+import Checkout from "../pages/CheckoutPage/Checkout";
 import { lazy, Suspense } from "react";
 const Checkin = lazy(() => import("../pages/CheckinPage/Checkin"));
 const AdminUsers = lazy(() => import("../pages/AdminUsersPage/AdminUsers"));
@@ -56,6 +57,15 @@ export default function AppRoutes() {
           </PrivateRoute>
         }
       />
+        <Route path="/event/:id" element={<EventDetail />} />
+        <Route
+            path="/checkout/:id"
+            element={
+                <PrivateRoute>
+                    <Checkout />
+                </PrivateRoute>
+            }
+        />
     </Routes>
   );
 }
