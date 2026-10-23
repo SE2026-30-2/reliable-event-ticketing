@@ -6,11 +6,7 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  console.log("Header User State:", user);
-  console.log("Roles array:", user?.roles);
-
   const isAdmin = user?.roles?.includes("ADMIN");
-  console.log("Is Admin?:", isAdmin);
 
   const handleLogout = () => {
     logout();
@@ -22,7 +18,7 @@ export default function Header() {
 
   return (
       <header className="bg-white border-b border-slate-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap gap-y-3 items-center justify-between">
           {/* Brand Logo & Navigation */}
           <div className="flex items-center space-x-12">
             <Link to="/home" className="flex items-center space-x-2.5 group">
@@ -37,6 +33,7 @@ export default function Header() {
             </Link>
 
             <nav className="hidden md:flex items-center space-x-8 text-[15px] font-semibold">
+              <Link to="/checkin" className={`relative py-2 transition-colors ${isActive('/checkin') ? 'text-[#4353ff]' : 'text-slate-600 hover:text-slate-900'}`}>Soát vé</Link>
               {/* Trang chủ - Ai cũng thấy */}
               <Link
                   to="/home"

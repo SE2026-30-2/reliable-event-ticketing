@@ -32,11 +32,8 @@ export default function Register() {
 
             // Sau khi đăng ký thành công, tự động gọi luôn API login hoặc chuyển hướng về /login
             try {
-                const loginData = await authService.login({ email, password });
-                const token = loginData?.token || loginData?.accessToken || loginData?.access_token;
-                const refreshToken = loginData?.refreshToken;
-                const userData = loginData?.user || { email, fullName };
-                login(userData, token, refreshToken);
+                const { user, accessToken, refreshToken } = await authService.loginWithProfile({ email, password });
+                login(user, accessToken, refreshToken);
             } catch {
                 // Nếu backend không tự cấp token sau đăng ký thì chuyển hướng qua trang login
                 navigate('/login');

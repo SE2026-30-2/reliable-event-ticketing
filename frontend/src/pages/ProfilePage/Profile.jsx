@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../../components/layout/Header';
 import Footer from '../../components/layout/Footer';
 import { useAuth } from '../../contexts/useAuth';
@@ -98,6 +98,7 @@ export default function Profile() {
 
                     {/* CỘT TRÁI: Sidebar Điều hướng */}
                     <aside className="lg:col-span-3 space-y-2">
+                        {roles.includes('ADMIN') && <Link to="/admin/users" className="block px-4 py-3 bg-white border border-indigo-100 rounded-xl text-indigo-600 font-semibold text-sm">Quản trị người dùng →</Link>}
                         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100/80 space-y-1">
                             <button className="w-full flex items-center space-x-3 px-4 py-3 bg-indigo-50 text-indigo-600 font-bold text-sm rounded-xl transition">
                                 <svg className="w-5 h-5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
