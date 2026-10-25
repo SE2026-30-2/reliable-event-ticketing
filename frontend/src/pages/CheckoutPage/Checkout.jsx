@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
 import { eventService } from "../../services/eventService.js";
@@ -7,6 +7,7 @@ import { eventService } from "../../services/eventService.js";
 export default function Checkout() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Data states
     const [event, setEvent] = useState(null);
@@ -17,16 +18,16 @@ export default function Checkout() {
     const [paymentMethod, setPaymentMethod] = useState("vnpay");
     const [timeLeft, setTimeLeft] = useState(600); // 10 phút giữ chỗ
 
-    // Giả định thông tin booking từ bước trước (hoặc state/location)
-    const [bookingDetails] = useState({
+    // 1. Nhận thông tin booking truyền từ EventDetail (hoặc dữ liệu mặc định)
+    const bookingDetails = location.state || {
         ticketType: "VIP",
         packageInfo: "Gói 2 ngày",
         quantity: 2,
-        pricePerTicket: 2500000,
+        pricePerTicket: 2250000,
         customerName: "Nguyễn Văn A",
         customerEmail: "nguyenvana@example.com",
-        orderCode: "EH20251025001"
-    });
+        orderCode: "EH" + Date.now().toString().slice(-8)
+    };
 
     // Countdown Timer 10 phút
     useEffect(() => {
@@ -62,7 +63,7 @@ export default function Checkout() {
         if (id) {
             fetchEventDetail();
         } else {
-            // Mock data hiển thị tạm nếu chưa truyền ID
+            // Mock data hiển thị tạm nếu không tìm thấy ID
             setEvent({
                 name: "The Dreams Concert 2025",
                 venue: "SVĐ Mỹ Đình, Hà Nội",
@@ -94,11 +95,24 @@ export default function Checkout() {
         });
     };
 
+    // 2. Sửa phép tính tổng tiền
     const totalAmount = bookingDetails.quantity * bookingDetails.pricePerTicket;
 
+    // 3. Hàm xử lý chuyển hướng sang Cổng thanh toán (PaymentGateway)
     const handlePayment = () => {
-        alert(`Tiến hành thanh toán đơn hàng #${bookingDetails.orderCode} qua ${paymentMethod.toUpperCase()}`);
-        // Logic gọi API thanh toán ở đây...
+        navigate("/payment-gateway", {
+            state: {
+                orderCode: bookingDetails.orderCode,
+                eventName: event?.name || "The Dreams Concert 2025",
+                ticketType: bookingDetails.ticketType,
+                packageInfo: bookingDetails.packageInfo,
+                quantity: bookingDetails.quantity,
+                totalAmount: totalAmount,
+                customerName: bookingDetails.customerName,
+                customerEmail: bookingDetails.customerEmail,
+                paymentMethod: paymentMethod
+            }
+        });
     };
 
     if (loading) {
@@ -428,7 +442,7 @@ export default function Checkout() {
                             <div className="space-y-3 text-xs">
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-500">Sự kiện</span>
-                                    <span className="font-bold text-slate-800 text-right">{event.name}</span>
+                                    <span className="font-bold text-slate-800 text-right">{event?.name || "The Dreams Concert 2025"}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-500">Loại vé</span>
@@ -475,9 +489,9 @@ export default function Checkout() {
 
                                 <div className="flex items-center justify-between gap-3 pt-1">
                                     <div className="space-y-1">
-                                        <h4 className="text-xs font-bold text-slate-900 leading-snug">{event.name}</h4>
+                                        <h4 className="text-xs font-bold text-slate-900 leading-snug">{event?.name || "The Dreams Concert 2025"}</h4>
                                         <p className="text-[11px] text-slate-500 font-medium">{bookingDetails.ticketType} • {bookingDetails.quantity} vé</p>
-                                        <p className="text-[10px] text-slate-400">{event.venue}</p>
+                                        <p className="text-[10px] text-slate-400">{event?.venue || "SVĐ Mỹ Đình, Hà Nội"}</p>
                                     </div>
                                     <div className="w-16 h-16 p-1 bg-white border border-slate-200 rounded-xl shrink-0 flex items-center justify-center">
                                         <svg className="w-full h-full text-slate-800" fill="currentColor" viewBox="0 0 100 100">
