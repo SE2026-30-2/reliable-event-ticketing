@@ -25,7 +25,6 @@ export default function AppRoutes() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/events/:eventId" element={<EventDetail />} />
       <Route path="/event/:eventId" element={<EventDetail />} />
       <Route path="/checkin" element={<Suspense fallback={<p role="status">Đang mở màn soát vé…</p>}><Checkin /></Suspense>} />
       <Route path="/admin/users" element={<PrivateRoute><Suspense fallback={<p role="status">Đang mở quản trị người dùng…</p>}><AdminUsers /></Suspense></PrivateRoute>} />
@@ -60,7 +59,6 @@ export default function AppRoutes() {
           </PrivateRoute>
         }
       />
-        <Route path="/event/:id" element={<EventDetail />} />
         <Route
             path="/checkout/:id"
             element={
