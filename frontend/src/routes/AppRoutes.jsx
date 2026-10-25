@@ -10,6 +10,9 @@ import EventManagement from "../pages/EventManagementPage/EventManagement";
 import EventDetail from "../pages/EventDetailPage/EventDetail";
 import Checkout from "../pages/CheckoutPage/Checkout";
 import { lazy, Suspense } from "react";
+import PaymentGateway from "../pages/PaymentPage/PaymentGateway";
+
+
 const Checkin = lazy(() => import("../pages/CheckinPage/Checkin"));
 const AdminUsers = lazy(() => import("../pages/AdminUsersPage/AdminUsers"));
 
@@ -66,6 +69,15 @@ export default function AppRoutes() {
                 </PrivateRoute>
             }
         />
+        <Route
+            path="/payment-gateway"
+            element={
+                <PrivateRoute>
+                    <PaymentGateway />
+                </PrivateRoute>
+            }
+        />
+
     </Routes>
   );
 }
