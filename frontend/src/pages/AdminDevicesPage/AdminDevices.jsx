@@ -1,8 +1,8 @@
+import AdminLayout from '../../components/layout/AdminLayout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import { adminDeviceService, deviceError } from '../../services/adminDeviceService';
-import { userService } from '../../services/userService';
 import { Dialog, Field, Icon } from '../EventManagementPage/managementUi';
 import { createPreviewService, eventName, filterDevices, withoutKey } from './deviceUtils';
 import '../EventManagementPage/event-management.css';
@@ -82,7 +82,6 @@ function RevokeDialog({ device, api, close, complete }) {
 }
 
 function Workspace({ preview }) {
-  const { user, logout } = useAuth();
   const api = useMemo(() => preview ? createPreviewService() : adminDeviceService, [preview]);
   const [devices, setDevices] = useState([]), [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true), [error, setError] = useState('');
@@ -105,11 +104,8 @@ function Workspace({ preview }) {
   const globalCount = devices.filter((device) => !device.eventId).length;
   function changeFilter(key, value) { setFilters((old) => ({ ...old, [key]: value })); setPage(0); }
   function refresh() { setLoading(true); setEventsLoading(true); setError(''); setEventsError(''); setRevision((n) => n + 1); }
-  async function signOut() { try { await userService.logout(); } finally { logout(); } }
-  return <div className="event-management admin-devices">
-    <header className="em-header"><Link className="em-brand" to="/home"><span><Icon /></span>EventHub</Link><nav aria-label="Điều hướng chính"><Link to="/home">Trang chủ</Link><Link to="/manage">Sự kiện</Link><Link to="/#features">Về chúng tôi</Link></nav><details className="em-account"><summary><span className="em-avatar">{(user?.fullName || 'A').charAt(0)}</span>{user?.fullName || 'Admin'} ⌄</summary><div><Link to="/profile">Hồ sơ cá nhân</Link><Link to="/admin/users">Quản trị người dùng</Link>{!preview && <button onClick={() => { void signOut().catch(() => {}); }}>Đăng xuất</button>}</div></details></header>
-    <div className="ad-layout"><aside className="ad-sidebar"><h2>Quản trị hệ thống</h2><nav aria-label="Quản trị hệ thống"><Link to="/manage"><Icon name="calendar" />Quản lý sự kiện</Link><Link to="/admin/devices" aria-current="page"><Icon name="device" />Quản trị thiết bị</Link><Link to="/admin/users"><Icon name="users" />Người dùng</Link><Link to="/checkin"><Icon name="ticket" />Soát vé</Link></nav></aside>
-      <main className="ad-main">
+  return <AdminLayout className="admin-devices" preview={preview}>
+      <div>
         {preview && <p className="em-preview">Bản xem thử · Dữ liệu minh họa, thao tác chỉ lưu trong phiên này. Key mẫu không dùng để soát vé thật.</p>}
         <nav className="au-breadcrumb" aria-label="Đường dẫn"><span>Quản trị hệ thống</span><span>›</span><span>Quản trị thiết bị</span></nav>
         <section className="ad-heading"><div><h1>Quản trị thiết bị toàn cầu</h1><p>Quản lý các thiết bị check-in được sử dụng tại mọi sự kiện. Tạo thiết bị mới và thu hồi key khi cần thiết.</p></div><button className="primary" disabled={loading || !!error} onClick={() => { setNotice(''); setModal({ kind: 'create' }); }}>＋ Tạo thiết bị mới</button></section>
@@ -124,13 +120,12 @@ function Workspace({ preview }) {
             <footer className="au-footer ad-footer"><p>Hiển thị {filtered.length ? current * size + 1 : 0}–{Math.min((current + 1) * size, filtered.length)} của <strong>{filtered.length}</strong> thiết bị</p><nav aria-label="Phân trang thiết bị"><button aria-label="Trang trước" disabled={current === 0} onClick={() => setPage(current - 1)}>‹</button><span>Trang {current + 1} / {pages}</span><button aria-label="Trang sau" disabled={current === pages - 1} onClick={() => setPage(current + 1)}>›</button></nav><select aria-label="Số thiết bị mỗi trang" value={size} onChange={(e) => { setSize(Number(e.target.value)); setPage(0); }}>{[10, 20, 50].map((n) => <option key={n} value={n}>{n} / trang</option>)}</select></footer>
           </>}
         </section>
-      </main>
-    </div>
+      </div>
     {modal?.kind === 'create' && <CreateDevice api={api} events={events} eventsLoading={eventsLoading} eventsError={eventsError} close={() => setModal(null)} complete={(result) => { setDevices((items) => [withoutKey(result), ...items.filter((item) => item.deviceId !== result.deviceId)]); setModal({ kind: 'key', device: result }); }} />}
     {modal?.kind === 'key' && <KeyDialog device={modal.device} close={() => { setNotice('Đã tạo thiết bị. API key không thể xem lại.'); setModal(null); }} />}
     {modal?.kind === 'revoke' && <RevokeDialog device={modal.device} api={api} close={() => setModal(null)} complete={(result) => { setDevices((items) => items.map((item) => item.deviceId === result.deviceId ? withoutKey(result) : item)); setNotice('Đã thu hồi thiết bị. API key không còn hiệu lực.'); setModal(null); }} />}
     {modal?.kind === 'detail' && <Dialog title="Chi tiết thiết bị" close={() => setModal(null)}><dl className="au-detail"><dt>Tên thiết bị</dt><dd>{modal.device.label}</dd><dt>Mã thiết bị</dt><dd>{modal.device.deviceId}</dd><dt>Sự kiện</dt><dd>{eventName(modal.device.eventId, events)}</dd><dt>Trạng thái</dt><dd>{modal.device.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã thu hồi'}</dd><dt>Ngày tạo</dt><dd>{dateTime(modal.device.createdAt)}</dd><dt>Hoạt động lần cuối</dt><dd>{dateTime(modal.device.lastSeenAt)}</dd><dt>Thu hồi lúc</dt><dd>{modal.device.revokedAt ? dateTime(modal.device.revokedAt) : 'Chưa thu hồi'}</dd></dl><p className="ad-muted">API key chỉ được cấp lúc tạo thiết bị và không thể xem lại.</p></Dialog>}
-  </div>;
+  </AdminLayout>;
 }
 
 export default function AdminDevices({ preview = false }) {

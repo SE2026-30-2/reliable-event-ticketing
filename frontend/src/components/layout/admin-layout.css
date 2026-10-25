@@ -1,0 +1,17 @@
+.admin-console-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: calc(100vh - 80px); }
+.admin-console-body { min-height: calc(100vh - 80px); }
+.admin-console-sidebar { background: #ffffffb8; border-right: 1px solid #e7ecfa; padding: 27px 15px; }
+.admin-console-title { display: flex; align-items: center; gap: 10px; margin: 0 8px 27px; }
+.admin-console-title > span { display: grid; place-items: center; color: #6345ff; background: #eeebff; border-radius: 10px; width: 35px; height: 38px; }
+.admin-console-title h2 { font-size: 13px; font-weight: 750; margin: 0; }
+.admin-console-title p { font-size: 10px; color: #7e89a9; margin: 3px 0 0; }
+.admin-console-sidebar nav { display: grid; gap: 8px; }
+.admin-console-sidebar nav a { display: flex; align-items: center; gap: 11px; padding: 14px 12px; border: 1px solid transparent; border-radius: 10px; font-size: 12px; color: #627198; }
+.admin-console-sidebar nav a:hover { background: #f3f1ff; }
+.admin-console-sidebar nav a[aria-current=page] { background: #edeaff; border-color: #e4ddff; color: #5636ff; font-weight: 700; }
+.admin-console-arrow { margin-left: auto; font-size: 18px; }
+.event-management a.admin-console-about { display: inline-flex; align-items: center; gap: 9px; margin: 28px 12px 0; color: #7985a7; font-size: 12px; }
+.admin-console-main { min-width: 0; width: 100%; max-width: 1500px; margin: 0 auto; padding: 28px; }
+@media (min-width: 1650px) { .admin-console-main { padding: 36px 42px; } }
+@media (max-width: 1100px) { .admin-console-layout { grid-template-columns: 210px minmax(0, 1fr); } .admin-console-main { padding: 24px 20px; } .admin-console .au-heading { flex-wrap: wrap; } .admin-console .au-stats { width: 100%; } }
+@media (max-width: 700px) { .admin-console-layout { grid-template-columns: minmax(0, 1fr); } .admin-console-sidebar { border-right: 0; border-bottom: 1px solid #e7ecfa; padding: 16px; } .admin-console-title { margin: 0 0 12px; } .admin-console-title p { display: none; } .admin-console-sidebar nav { gap: 5px; } .admin-console-sidebar nav a { padding: 10px 12px; } .admin-console-main { padding: 22px 14px; } }

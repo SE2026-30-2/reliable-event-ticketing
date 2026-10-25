@@ -1,0 +1,62 @@
+.ap-main { max-width: 1260px; }
+.ap-account { display: flex; align-items: center; gap: 10px; margin-left: auto; font-size: 12px; }
+.ap-panel { padding: 22px; margin-bottom: 18px; border: 1px solid #edf0fa; border-radius: 13px; background: #ffffffdd; box-shadow: 0 10px 40px #5269b008; }
+.ap-panel h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; font-size: 16px; font-weight: 750; }
+.ap-panel h2 svg { color: #6345ff; }
+.ap-search-type { border: 0; padding: 0; margin: 0 0 16px; display: flex; flex-wrap: wrap; gap: 20px 35px; }
+.ap-search-type label { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.ap-search-type label:has(input:disabled) { color: #8993b1; }
+.ap-search-type input { accent-color: #6345ff; width: 17px; height: 17px; }
+.ap-search-row { display: flex; gap: 14px; }
+.ap-search-row > button { min-width: 125px; }
+.ap-input { display: flex; min-width: 0; flex: 1; border: 1px solid #d4dcf3; border-radius: 7px; background: white; }
+.ap-input input { width: 100%; min-width: 0; border: 0; background: transparent; padding: 12px; color: #30366a; font: inherit; font-size: 13px; }
+.admin-payments .ap-input button { border: 0; background: transparent; padding: 6px 13px; font-size: 22px; color: #7382ad; }
+.ap-help { margin: 10px 0 0; color: #7885ac; font-size: 11px; line-height: 1.7; }
+.ap-api-note { margin-top: 10px; font-size: 11px; color: #6d79a2; }
+.ap-api-note summary { cursor: pointer; }
+.ap-api-note p { margin: 8px 0 0; max-width: 750px; }
+.ap-panel-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 18px; }
+.ap-panel-title h2 { margin: 0; }
+.ap-payment-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 22px; }
+.ap-payment-meta { border: 1px solid #e9edfa; border-radius: 9px; padding: 16px; background: #ffffff80; }
+.ap-id { margin-bottom: 20px; }
+.ap-id > span, .ap-data dt { color: #62719c; font-size: 12px; margin-bottom: 5px; }
+.ap-id > div { display: flex; align-items: flex-start; gap: 6px; }
+.ap-id strong { font-size: 13px; overflow-wrap: anywhere; }
+.admin-payments .ap-id button { border: 0; background: transparent; color: #6345ff; padding: 0 4px; font-size: 18px; }
+.ap-id small { display: block; color: #62719c; margin-top: 5px; }
+.ap-data { margin: 0; }
+.ap-data dd { margin: 0 0 20px; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.ap-data dd:last-child { margin-bottom: 0; }
+.ap-provider { display: flex; align-items: center; gap: 10px; }
+.ap-provider > span { background: #07529e; color: white; font-style: italic; padding: 6px; border-radius: 6px; font-size: 15px; }
+.ap-payment-total { padding: 12px 0; }
+.ap-payment-art { display: flex; align-items: center; gap: 16px; background: linear-gradient(120deg, #f1ebff, #edf4ff); padding: 20px; border-radius: 9px; margin-bottom: 24px; }
+.ap-payment-art > svg { width: 44px; height: 44px; padding: 9px; color: #6345ff; background: white; border-radius: 10px; }
+.ap-payment-art strong { font-size: 17px; }
+.ap-payment-art p { color: #7682a6; font-size: 12px; margin: 4px 0 0; }
+.ap-data dd.ap-amount, .ap-amount { color: #6345ff; font-size: 24px; font-weight: 800; }
+.ap-status.completed { color: #07945e; background: #d9f6e9; }
+.ap-status.failed { color: #db3154; background: #ffedf1; }
+.ap-status.pending, .ap-status.refund_required { color: #966315; background: #fff2d7; }
+.ap-status.refunded { color: #5660a7; background: #edf0ff; }
+.ap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ap-actions article { border: 1px solid #e3e7f7; border-radius: 9px; padding: 16px; display: flex; flex-direction: column; }
+.ap-actions h3 { display: flex; gap: 10px; align-items: center; font-size: 13px; margin: 0; font-weight: 700; }
+.ap-actions h3 svg { color: #6345ff; }
+.ap-actions p { font-size: 12px; color: #7885a9; margin: 12px 0 20px; flex: 1; }
+.ap-actions article button { color: #6345ff; border-color: #b6aaff; }
+.ap-actions article.ap-refund-action { background: #fff5f6; border-color: #ffdce3; }
+.ap-refund-action h3, .ap-refund-action h3 svg, .ap-actions article.ap-refund-action button { color: #f33257; }
+.ap-actions article.ap-refund-action button { border-color: #ff9aaf; }
+.ap-empty { display: grid; place-items: center; color: #7c86ac; padding: 55px 20px; font-size: 13px; text-align: center; }
+.ap-empty svg { width: 35px; height: 35px; color: #b9aff9; }
+.ap-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ap-warning { background: #fff0f3; color: #d93250; border-radius: 8px; padding: 14px; font-size: 13px; }
+.ap-refund-summary { display: grid; grid-template-columns: 135px minmax(0, 1fr); gap: 12px; font-size: 12px; margin: 22px 0; }
+.ap-refund-summary dt { color: #6e7ba6; }
+.ap-refund-summary dd { margin: 0; overflow-wrap: anywhere; font-weight: 650; }
+.ap-refund-summary dd.ap-amount { font-size: 19px; }
+@media (max-width: 950px) { .ap-payment-grid { grid-template-columns: 1fr; } .ap-payment-total { padding: 0; } .ap-panel-title { align-items: flex-start; flex-wrap: wrap; } }
+@media (max-width: 700px) { .admin-payments .em-header { gap: 12px; padding: 0 16px; height: 68px; } .admin-payments .em-header > nav { display: none; } .ap-panel { padding: 16px; } .ap-search-row { flex-wrap: wrap; } .ap-search-row > button { width: 100%; } .ap-input { flex-basis: 100%; } .ap-actions { grid-template-columns: 1fr; } .ap-refund-summary { grid-template-columns: 1fr; gap: 5px; } .ap-refund-summary dd { margin-bottom: 10px; } }

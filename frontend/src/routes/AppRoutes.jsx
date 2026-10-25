@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Link, Navigate, Routes, Route } from "react-router-dom";
 import LandingPage from "../pages/LandingPage";
 import Login from "../pages/LoginPage/Login";
 import Register from "../pages/RegisterPage/Register";
@@ -12,6 +12,7 @@ import { lazy, Suspense } from "react";
 const Checkin = lazy(() => import("../pages/CheckinPage/Checkin"));
 const AdminUsers = lazy(() => import("../pages/AdminUsersPage/AdminUsers"));
 const AdminDevices = lazy(() => import("../pages/AdminDevicesPage/AdminDevices"));
+const AdminPayments = lazy(() => import("../pages/AdminPaymentsPage/AdminPayments"));
 
 // Import thêm các trang khác sau này ở đây
 
@@ -25,14 +26,17 @@ export default function AppRoutes() {
       <Route path="/events/:eventId" element={<EventDetail />} />
       <Route path="/event/:eventId" element={<EventDetail />} />
       <Route path="/checkin" element={<Suspense fallback={<p role="status">Đang mở màn soát vé…</p>}><Checkin /></Suspense>} />
-      <Route path="/admin/users" element={<PrivateRoute><Suspense fallback={<p role="status">Đang mở quản trị người dùng…</p>}><AdminUsers /></Suspense></PrivateRoute>} />
-      <Route path="/admin/devices" element={<PrivateRoute><Suspense fallback={<p role="status">Đang mở quản trị thiết bị…</p>}><AdminDevices /></Suspense></PrivateRoute>} />
+      <Route path="/admin" element={<PrivateRoute roles={['ADMIN']}><Navigate to="/admin/users" replace /></PrivateRoute>} />
+      <Route path="/admin/users" element={<PrivateRoute roles={['ADMIN']}><Suspense fallback={<p role="status">Đang mở quản trị người dùng…</p>}><AdminUsers /></Suspense></PrivateRoute>} />
+      <Route path="/admin/devices" element={<PrivateRoute roles={['ADMIN']}><Suspense fallback={<p role="status">Đang mở quản trị thiết bị…</p>}><AdminDevices /></Suspense></PrivateRoute>} />
+      <Route path="/admin/payments" element={<PrivateRoute roles={['ADMIN']}><Suspense fallback={<p role="status">Đang mở quản trị thanh toán…</p>}><AdminPayments /></Suspense></PrivateRoute>} />
+      {import.meta.env.DEV && <Route path="/admin/payments/preview" element={<Suspense fallback={<p role="status">Đang mở bản xem thử…</p>}><AdminPayments preview /></Suspense>} />}
       {import.meta.env.DEV && <Route path="/admin/devices/preview" element={<Suspense fallback={<p role="status">Đang mở bản xem thử…</p>}><AdminDevices preview /></Suspense>} />}
       {import.meta.env.DEV && <Route path="/admin/users/preview" element={<Suspense fallback={<p role="status">Đang mở bản xem thử…</p>}><AdminUsers preview /></Suspense>} />}
       <Route
         path="/manage"
         element={
-          <PrivateRoute>
+          <PrivateRoute roles={['ADMIN', 'ORGANIZER']}>
             <ManageEvents />
           </PrivateRoute>
         }
@@ -40,7 +44,7 @@ export default function AppRoutes() {
       {import.meta.env.DEV && (
         <Route path="/manage/preview" element={<ManageEvents preview />} />
       )}
-      <Route path="/manage/events/:eventId" element={<PrivateRoute><EventManagement /></PrivateRoute>} />
+      <Route path="/manage/events/:eventId" element={<PrivateRoute roles={['ADMIN', 'ORGANIZER']}><EventManagement /></PrivateRoute>} />
       {import.meta.env.DEV && <Route path="/manage/preview/events/:eventId" element={<EventManagement preview />} />}
       <Route
         path="/home"
@@ -59,6 +63,7 @@ export default function AppRoutes() {
           </PrivateRoute>
         }
       />
+      <Route path="*" element={<div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center"><h1 className="text-2xl font-bold">Không tìm thấy trang</h1><p>Đường dẫn này không tồn tại hoặc chức năng chưa được hỗ trợ.</p><Link to="/" className="text-indigo-600 underline">Về trang chủ</Link></div>} />
     </Routes>
   );
 }

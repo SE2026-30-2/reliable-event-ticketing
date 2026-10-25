@@ -52,7 +52,8 @@ test('admin can reach devices from the home navigation on desktop and mobile', a
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/home');
-    await page.getByRole('link', { name: 'Quản trị thiết bị', exact: true }).filter({ visible: true }).click();
+    await page.getByRole('link', { name: 'Quản trị hệ thống', exact: true }).filter({ visible: true }).click();
+    await page.getByRole('navigation', { name: 'Các mục quản trị hệ thống', exact: true }).getByRole('link', { name: 'Quản trị thiết bị' }).click();
     await expect(page.getByRole('heading', { name: 'Quản trị thiết bị toàn cầu' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
