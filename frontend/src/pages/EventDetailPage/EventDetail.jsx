@@ -5,7 +5,7 @@ import Footer from "../../components/layout/Footer";
 import { eventService } from "../../services/eventService.js";
 
 export default function EventDetail() {
-    const { id } = useParams();
+    const { eventId } = useParams();
     const navigate = useNavigate(); // Hook chuyển trang
 
     const [event, setEvent] = useState(null);
@@ -27,7 +27,7 @@ export default function EventDetail() {
         const fetchEventDetail = async () => {
             setLoading(true);
             try {
-                const data = await eventService.getEventById(id);
+                const data = await eventService.getEventById(eventId);
                 setEvent(data);
             } catch (err) {
                 console.error("Lỗi khi tải thông tin sự kiện:", err);
@@ -37,10 +37,10 @@ export default function EventDetail() {
             }
         };
 
-        if (id) {
+        if (eventId) {
             fetchEventDetail();
         }
-    }, [id]);
+    }, [eventId]);
 
     const formatDate = (dateString) => {
         if (!dateString) return "";
@@ -73,7 +73,7 @@ export default function EventDetail() {
         const pricePerTicket = basePrice * (1 - discountRate);
 
         // Chuyển sang trang Checkout và đính kèm state
-        navigate(`/checkout/${id}`, {
+        navigate(`/checkout/${eventId}`, {
             state: {
                 ticketType: selectedTicket,
                 packageInfo: selectedTicket === "VIP" ? "Gói 2 ngày" : "Vé thường",
