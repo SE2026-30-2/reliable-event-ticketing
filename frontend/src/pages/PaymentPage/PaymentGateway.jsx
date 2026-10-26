@@ -44,9 +44,10 @@ export default function PaymentGateway() {
         setTimeout(() => {
             setIsProcessing(false);
             // Chuyển sang trang kết quả thành công
-            navigate("/payment-success", {
+            navigate("/payment-result", {
                 state: {
                     ...bookingData,
+                    status: "success",
                     paidAt: new Date().toISOString(),
                     transactionId: "VNP" + Math.floor(10000000 + Math.random() * 90000000)
                 }
