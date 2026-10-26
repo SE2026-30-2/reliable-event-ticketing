@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 import { Icon } from '../../pages/EventManagementPage/managementUi';
 import '../../pages/EventManagementPage/event-management.css';
 import './admin-layout.css';
@@ -21,5 +22,6 @@ export default function AdminLayout({ children, preview = false, className = '' 
       </aside>
       <main className="admin-console-main">{children}</main>
     </div></div>
+    <Footer />
   </div>;
 }

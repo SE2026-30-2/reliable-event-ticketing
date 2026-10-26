@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/useAuth';
+import Header from '../../components/layout/Header';
+import Footer from '../../components/layout/Footer';
 import { manageEventService } from '../../services/manageEventService';
 import { ActionForm, Badge, Dialog, Field, Icon, Message, Panel, ResourceState, Stat, Table } from './managementUi';
 import { useResource } from './useResource';
@@ -50,7 +51,6 @@ function Overview({ event, report, edit, selectTab, api }) {
 }
 
 function Workspace({ preview, eventId }) {
-  const { user, logout } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = tabs.some(([key]) => key === params.get('tab')) ? params.get('tab') : 'overview';
   const [refresh, setRefresh] = useState(0), [notice, setNotice] = useState(''), [modal, setModal] = useState(null);
@@ -60,7 +60,7 @@ function Workspace({ preview, eventId }) {
   const selectTab = (key) => { setParams({ tab: key }); setNotice(''); setRefresh((n) => n + 1); };
   const changed = (message) => { setNotice(message); setModal(null); setRefresh((n) => n + 1); };
   const base = preview ? '/manage/preview' : '/manage';
-  return <div className="event-management"><header className="em-header"><Link className="em-brand" to={base}><span><Icon /></span>EventHub</Link><nav aria-label="Điều hướng chính"><Link to="/home">Trang chủ</Link><Link to={base}>Sự kiện</Link><Link to="/#features">Về chúng tôi</Link></nav><details className="em-account"><summary><span className="em-avatar">{(user?.fullName || user?.email || 'N').charAt(0).toUpperCase()}</span><span>{user?.fullName || 'Nhà tổ chức'}</span>⌄</summary><div><Link to="/profile">Hồ sơ cá nhân</Link><Link to={base}>Quản lý sự kiện</Link>{!preview && <button onClick={logout}>Đăng xuất</button>}</div></details></header>
+  return <><Header /><div className="event-management">
     <div className="em-container">{preview && <div className="em-preview">Bản xem thử · Dữ liệu minh họa, thao tác chỉ lưu trong phiên này.</div>}<nav className="em-breadcrumb" aria-label="Đường dẫn"><Link to={base}>Quản trị sự kiện</Link><span>›</span><span>{event?.name || 'Chi tiết sự kiện'}</span></nav>
       {notice && <Message>{notice}</Message>}<ResourceState resource={resource} retry={() => setRefresh((n) => n + 1)} />
       {resource.error && <div className="em-error-links"><Link to={base}>Quay lại danh sách</Link><Link to="/login" state={{ from: `/manage/events/${eventId}` }}>Đăng nhập lại</Link></div>}
@@ -79,7 +79,7 @@ function Workspace({ preview, eventId }) {
       {modal === 'edit' && <EventForm event={event} api={api} changed={changed} close={() => setModal(null)} />}
       {(modal === 'cancel' || modal === 'publish') && <Dialog title={modal === 'cancel' ? 'Hủy sự kiện?' : 'Xuất bản sự kiện?'} close={() => setModal(null)}><ActionForm submit={() => api.update(event.eventId, { status: modal === 'cancel' ? 'CANCELLED' : 'PUBLISHED' })} complete={() => changed(modal === 'cancel' ? 'Đã hủy sự kiện.' : 'Đã xuất bản sự kiện.')} label={modal === 'cancel' ? 'Xác nhận hủy sự kiện' : 'Xác nhận xuất bản'} danger={modal === 'cancel'} cancel={() => setModal(null)}><p><strong>{event.name}</strong></p><p>{modal === 'cancel' ? 'Sự kiện đã hủy không thể xuất bản lại. Bạn có chắc muốn tiếp tục?' : 'Sự kiện sẽ được hiển thị công khai để người dùng đặt vé.'}</p></ActionForm></Dialog>}
       </>}
-    </div></div>;
+    </div></div><Footer /></>;
 }
 export default function EventManagement({ preview = false }) {
   const { eventId = 'preview' } = useParams();
