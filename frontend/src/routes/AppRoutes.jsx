@@ -12,6 +12,7 @@ import Checkout from "../pages/CheckoutPage/Checkout";
 import { lazy, Suspense } from "react";
 import PaymentGateway from "../pages/PaymentPage/PaymentGateway";
 import PaymentResult from "../pages/PaymentPage/PaymentResult";
+import MyTickets from "../pages/MyTicketsPage/MyTickets";
 
 
 const Checkin = lazy(() => import("../pages/CheckinPage/Checkin"));
@@ -85,6 +86,7 @@ export default function AppRoutes() {
         />
 
         <Route path="/payment-result" element={<PaymentResult />} />
+        <Route path="/my-tickets" element={<MyTickets />} />
 
         <Route path="*" element={<div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center"><h1 className="text-2xl font-bold">Không tìm thấy trang</h1><p>Đường dẫn này không tồn tại hoặc chức năng chưa được hỗ trợ.</p><Link to="/home" className="text-indigo-600 underline">Về trang chủ</Link></div>} />
     </Routes>
