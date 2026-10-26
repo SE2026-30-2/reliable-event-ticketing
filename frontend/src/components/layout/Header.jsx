@@ -4,7 +4,7 @@ import { useAuth } from "../../contexts/useAuth";
 import { canManageEvents, hasRole } from "../../utils/permissions";
 import { userService } from '../../services/userService';
 
-export default function Header() {
+export default function Header({ onSearch }) {
   const { user, logout } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const location = useLocation();
@@ -25,10 +25,24 @@ export default function Header() {
   };
 
   // Helper kiểm tra active tab
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const navigation = [
+    { path: '/home', label: 'Trang chủ' },
+    { path: '/checkin', label: 'Soát vé' },
+    ...(canManage ? [{ path: '/manage', label: 'Quản lý sự kiện' }] : []),
+    ...(isAdmin ? [{ path: '/admin', label: 'Quản trị hệ thống' }] : []),
+    ...(user ? [{ path: '/history', label: 'Lịch sử đặt vé' }] : []),
+  ];
+  const renderNavigation = () => navigation.map(({ path, label }) => (
+    <Link key={path} to={path} aria-current={isActive(path) ? 'page' : undefined}
+      className={`relative py-2 transition-colors ${isActive(path) ? 'text-[#4353ff]' : 'text-slate-600 hover:text-slate-900'}`}>
+      {label}
+      {isActive(path) && <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#4353ff] rounded-full" />}
+    </Link>
+  ));
 
   return (
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-50">
+      <header className="font-sans text-base leading-normal bg-white border-b border-slate-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap md:flex-nowrap gap-x-4 gap-y-3 items-center justify-between">
           {/* Brand Logo & Navigation */}
           <div className="flex min-w-0 md:flex-1 flex-wrap md:flex-nowrap items-center gap-x-6 gap-y-3">
@@ -43,48 +57,8 @@ export default function Header() {
             </span>
             </Link>
 
-            <nav className="hidden md:flex min-w-0 items-center gap-x-3 xl:gap-x-5 overflow-x-auto whitespace-nowrap text-sm xl:text-[15px] font-semibold [&>a]:shrink-0">
-              <Link to="/checkin" className={`relative py-2 transition-colors ${isActive('/checkin') ? 'text-[#4353ff]' : 'text-slate-600 hover:text-slate-900'}`}>Soát vé</Link>
-              {/* Trang chủ - Ai cũng thấy */}
-              <Link
-                  to="/home"
-                  className={`relative py-2 transition-colors ${
-                      isActive("/home") ? "text-[#4353ff]" : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                Trang chủ
-                {isActive("/home") && (
-                    <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#4353ff] rounded-full"></span>
-                )}
-              </Link>
-
-              {/* Quản lý sự kiện dành cho nhà tổ chức và quản trị viên. */}
-              {canManage && <Link
-                  to="/manage"
-                  className={`relative py-2 transition-colors ${
-                      isActive("/manage") ? "text-[#4353ff]" : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                Quản lý sự kiện
-                {isActive("/manage") && (
-                    <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#4353ff] rounded-full"></span>
-                )}
-              </Link>}
-
-              {isAdmin && <Link to="/admin" aria-current={location.pathname.startsWith('/admin') ? 'page' : undefined} className={`relative py-2 transition-colors ${location.pathname.startsWith('/admin') ? 'text-[#4353ff]' : 'text-slate-600 hover:text-slate-900'}`}>Quản trị hệ thống{location.pathname.startsWith('/admin') && <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#4353ff] rounded-full" />}</Link>}
-
-              {/* Lịch sử đặt vé - Thường dành cho User mua vé */}
-              {user && <Link
-                  to="/history"
-                  className={`relative py-2 transition-colors ${
-                      isActive("/history") ? "text-[#4353ff]" : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                Lịch sử đặt vé
-                {isActive("/history") && (
-                    <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#4353ff] rounded-full"></span>
-                )}
-              </Link>}
+            <nav aria-label="Điều hướng chính" className="hidden md:flex min-w-0 items-center gap-x-3 xl:gap-x-5 overflow-x-auto whitespace-nowrap text-sm xl:text-[15px] font-semibold [&>a]:shrink-0">
+              {renderNavigation()}
             </nav>
           </div>
 
@@ -92,6 +66,7 @@ export default function Header() {
           <div className="flex shrink-0 items-center gap-2 xl:gap-4">
             <button
                 aria-label="Tìm kiếm"
+                onClick={onSearch}
                 className="p-2 text-slate-500 hover:text-slate-800 transition-colors rounded-full hover:bg-slate-100"
                 type="button"
             >
@@ -130,7 +105,9 @@ export default function Header() {
               <span>Đăng xuất</span>
             </button></> : <><Link to="/login" className="text-sm font-semibold text-indigo-600">Đăng nhập</Link><Link to="/register" className="text-sm font-semibold text-indigo-600">Đăng ký</Link></>}
           </div>
-          {canManage && <nav aria-label="Điều hướng quản lý" className="flex w-full flex-wrap gap-4 text-sm font-semibold text-indigo-600 md:hidden"><Link to="/manage">Quản lý sự kiện</Link>{isAdmin && <Link to="/admin" aria-current={location.pathname.startsWith('/admin') ? 'page' : undefined}>Quản trị hệ thống</Link>}</nav>}
+          <nav aria-label="Điều hướng trên điện thoại" className="flex w-full items-center gap-5 overflow-x-auto whitespace-nowrap text-sm font-semibold md:hidden [&>a]:shrink-0">
+            {renderNavigation()}
+          </nav>
         </div>
       </header>
   );

@@ -98,7 +98,7 @@ test('profile cannot expose admin links from a different profile role snapshot',
 test('checkin keeps device login but hides event management from buyers', async ({ page }) => {
   await setup(page, ['USER']);
   await page.goto('/checkin');
-  await expect(page.locator('.ci-header')).toBeVisible();
+  await expect(page.locator('header')).toBeVisible();
   await expect(page.locator('a[href="/manage"]')).toHaveCount(0);
 });
 
