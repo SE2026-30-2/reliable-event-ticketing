@@ -22,6 +22,7 @@ export default function EventDetail() {
     const [isCouponApplied, setIsCouponApplied] = useState(true);
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
+    const [bannerFailed, setBannerFailed] = useState(false);
 
     useEffect(() => {
         const fetchEventDetail = async () => {
@@ -177,14 +178,15 @@ export default function EventDetail() {
                         </div>
 
                         <div className="lg:col-span-5 relative min-h-[300px] lg:min-h-full overflow-hidden hero-mask">
-                            <img
+                            {!bannerFailed && event.bannerUrl ? <img
                                 alt={event.name}
                                 className="w-full h-full object-cover object-center scale-105"
-                                src={
-                                    event.bannerUrl ||
-                                    "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1200"
-                                }
-                            />
+                                src={event.bannerUrl}
+                                onError={() => setBannerFailed(true)}
+                            /> : <div role="img" aria-label={`Ảnh bìa mặc định cho ${event.name}`} className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-br from-indigo-500 via-violet-700 to-slate-950 text-white">
+                                <svg className="w-24 h-24 -rotate-12 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 4h16v5a3 3 0 0 0 0 6v5H4v-5a3 3 0 0 0 0-6V4Zm8 0v3m0 3v4m0 3v3" /></svg>
+                                <span className="text-3xl font-extrabold tracking-tight">EventHub</span>
+                            </div>}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent lg:hidden"></div>
                         </div>
 

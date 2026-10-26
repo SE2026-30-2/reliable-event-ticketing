@@ -1,3 +1,4 @@
+import AdminLayout from '../../components/layout/AdminLayout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
@@ -88,7 +89,7 @@ function UserDialog({ target, api, close, changed, currentUser }) {
 }
 
 function Workspace({ preview }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [users, setUsers] = useState([]), [loading, setLoading] = useState(true), [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0), [filters, setFilters] = useState(emptyFilters), [page, setPage] = useState(0), [size, setSize] = useState(10);
   const [target, setTarget] = useState(null), [notice, setNotice] = useState('');
@@ -106,9 +107,8 @@ function Workspace({ preview }) {
   function changeFilter(key, value) { setFilters((f) => ({ ...f, [key]: value })); setPage(0); }
   function retry() { setLoading(true); setError(''); setRefresh((n) => n + 1); }
   function open(action, item, event) { event.currentTarget.closest('details')?.removeAttribute('open'); setTarget({ action, user: item }); setNotice(''); }
-  return <div className="event-management admin-users">
-    <header className="em-header"><Link className="em-brand" to="/home"><span><Icon /></span>EventHub</Link><nav aria-label="Điều hướng chính"><Link to="/home">Trang chủ</Link><Link to="/manage">Sự kiện</Link><Link to="/#features">Về chúng tôi</Link></nav><details className="em-account"><summary><span className="em-avatar">{(user?.fullName || 'A').charAt(0)}</span>{user?.fullName || 'Admin'} ⌄</summary><div><Link to="/profile">Hồ sơ cá nhân</Link><Link to="/manage">Quản lý sự kiện</Link>{!preview && <button onClick={logout}>Đăng xuất</button>}</div></details></header>
-    <div className="au-container">
+  return <AdminLayout className="admin-users" preview={preview}>
+    <div>
       {preview && <p className="em-preview">Bản xem thử · Dữ liệu minh họa, thao tác chỉ lưu trong phiên này.</p>}
       <nav className="au-breadcrumb" aria-label="Đường dẫn"><span>Quản trị hệ thống</span><span>›</span><span>Quản trị người dùng</span></nav>
       <section className="au-heading"><div><h1>Quản trị người dùng</h1><p>Quản lý tài khoản người dùng trên hệ thống EventHub.</p></div><div className="au-stats">{['Tổng người dùng', 'Nhà tổ chức', 'Người tham dự'].map((label, i) => <div className="au-stat" key={label}><span className="au-stat-icon"><Icon name={i === 1 ? 'overview' : 'users'} /></span><div><p>{label}</p><strong>{loading || error ? '—' : number(stats[i])}</strong></div></div>)}</div></section>
@@ -131,7 +131,7 @@ function Workspace({ preview }) {
       </>}
     </div>
     {target && <UserDialog key={`${target.user.id}-${target.action}`} target={target} api={api} close={() => setTarget(null)} currentUser={user} changed={(updated, message) => { setUsers((items) => items.map((item) => item.id === updated.id ? updated : item)); setNotice(message); setTarget(null); }} />}
-  </div>;
+  </AdminLayout>;
 }
 
 export default function AdminUsers({ preview = false }) {
