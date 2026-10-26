@@ -31,7 +31,7 @@ export default function Header({ onSearch }) {
     { path: '/checkin', label: 'Soát vé' },
     ...(canManage ? [{ path: '/manage', label: 'Quản lý sự kiện' }] : []),
     ...(isAdmin ? [{ path: '/admin', label: 'Quản trị hệ thống' }] : []),
-    ...(user ? [{ path: '/history', label: 'Lịch sử đặt vé' }] : []),
+    ...(user ? [{ path: '/my-tickets', label: 'Vé của tôi' }] : []),
   ];
   const renderNavigation = () => navigation.map(({ path, label }) => (
     <Link key={path} to={path} aria-current={isActive(path) ? 'page' : undefined}
