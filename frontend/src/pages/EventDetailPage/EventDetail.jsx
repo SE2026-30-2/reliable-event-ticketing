@@ -200,14 +200,27 @@ export default function EventDetail({ currentUser: propUser }) {
                     couponCode: appliedCoupon
                 });
 
-                const fallbackPrice = getTicketPrice(selectedTicket) * quantity;
+                                const unitPrice = getTicketPrice(selectedTicket);
+                const fallbackPrice = unitPrice * quantity;
+                const reservationId = reservation?.reservationId || reservation?.id;
+                const finalTotal = quote?.finalPrice ?? fallbackPrice;
+                const ticketName = selectedTicket?.name || selectedTicket?.ticketTypeName || "Vé tiêu chuẩn";
 
                 // Navigate to Checkout Page
-                navigate(`/checkout/${reservation.id || eventId}`, {
+                navigate(`/checkout/${eventId}`, {
                     state: {
-                        reservationId: reservation.id,
-                        ticketType: selectedTicket,
+                        eventId,
+                        event,
+                        reservationId: reservationId,
+                        orderCode: reservationId ? "RES-" + String(reservationId).slice(0, 8).toUpperCase() : "EH" + Date.now().toString().slice(-8),
+                        ticketType: ticketName,
+                        selectedTicket,
+                        packageInfo: "Gói tiêu chuẩn",
                         quantity,
+                        pricePerTicket: unitPrice,
+                        totalAmount: finalTotal,
+                        customerName: fullName,
+                        customerEmail: email,
                         holderName: fullName,
                         holderEmail: email,
                         quote: quote || {

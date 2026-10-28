@@ -19,14 +19,43 @@ export default function Checkout() {
     const [timeLeft, setTimeLeft] = useState(600); // 10 phút giữ chỗ
 
     // 1. Nhận thông tin booking truyền từ EventDetail (hoặc dữ liệu mặc định)
-    const bookingDetails = location.state || {
-        ticketType: "VIP",
-        packageInfo: "Gói 2 ngày",
-        quantity: 2,
-        pricePerTicket: 2250000,
-        customerName: "Nguyễn Văn A",
-        customerEmail: "nguyenvana@example.com",
-        orderCode: "EH" + Date.now().toString().slice(-8)
+    const rawBooking = location.state || {};
+
+    const ticketTypeName = typeof rawBooking.ticketType === 'object'
+        ? (rawBooking.ticketType?.name || "Vé VIP")
+        : (rawBooking.ticketType || "VIP");
+
+    const quantity = Number(rawBooking.quantity) || 1;
+
+    const pricePerTicket = Number(
+        rawBooking.pricePerTicket ??
+        (rawBooking.quote?.originalPrice && quantity ? rawBooking.quote.originalPrice / quantity : 0) ??
+        (typeof rawBooking.ticketType === 'object' ? (rawBooking.ticketType?.priceCents ? rawBooking.ticketType.priceCents / 100 : rawBooking.ticketType?.price) : 0) ??
+        (rawBooking.selectedTicket?.priceCents ? rawBooking.selectedTicket.priceCents / 100 : rawBooking.selectedTicket?.price) ??
+        2250000
+    ) || 0;
+
+    const totalAmount = Number(
+        rawBooking.totalAmount ??
+        rawBooking.quote?.finalPrice ??
+        (pricePerTicket * quantity)
+    ) || 0;
+
+    const customerName = rawBooking.customerName || rawBooking.holderName || "Nguyễn Văn A";
+    const customerEmail = rawBooking.customerEmail || rawBooking.holderEmail || "nguyenvana@example.com";
+    const packageInfo = rawBooking.packageInfo || "Gói tiêu chuẩn";
+    const orderCode = rawBooking.orderCode || (rawBooking.reservationId ? "RES-" + String(rawBooking.reservationId).slice(0, 8).toUpperCase() : "EH" + Date.now().toString().slice(-8));
+
+    const bookingDetails = {
+        ...rawBooking,
+        ticketType: ticketTypeName,
+        packageInfo,
+        quantity,
+        pricePerTicket,
+        totalAmount,
+        customerName,
+        customerEmail,
+        orderCode,
     };
 
     // Countdown Timer 10 phút
@@ -95,8 +124,7 @@ export default function Checkout() {
         });
     };
 
-    // 2. Sửa phép tính tổng tiền
-    const totalAmount = bookingDetails.quantity * bookingDetails.pricePerTicket;
+    // 2. Tổng tiền đã được tính toán an toàn ở trên
 
     // 3. Hàm xử lý chuyển hướng sang Cổng thanh toán (PaymentGateway)
     const handlePayment = () => {
@@ -196,31 +224,31 @@ export default function Checkout() {
                             <div className="flex flex-col sm:flex-row gap-5">
                                 <div className="relative w-full sm:w-48 h-36 rounded-2xl overflow-hidden shrink-0 bg-slate-900">
                                     <img
-                                        alt={event.name}
+                                        alt={event?.name || "Sự kiện"}
                                         className="w-full h-full object-cover"
-                                        src={event.bannerUrl || "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1200"}
+                                        src={event?.bannerUrl || "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1200"}
                                     />
                                 </div>
                                 <div className="flex flex-col justify-between py-0.5">
                                     <div className="space-y-2">
-                                        <h2 className="text-lg font-extrabold text-slate-900">{event.name}</h2>
+                                        <h2 className="text-lg font-extrabold text-slate-900">{event?.name}</h2>
                                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
                                             <div className="flex items-center gap-1.5">
                                                 <svg className="w-4 h-4 text-[#4353ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
                                                 </svg>
-                                                <span>{event.venue}</span>
+                                                <span>{event?.venue}</span>
                                             </div>
                                             <span className="text-slate-300">|</span>
                                             <div className="flex items-center gap-1.5">
                                                 <svg className="w-4 h-4 text-[#4353ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
                                                 </svg>
-                                                <span>{formatDate(event.startsAt)}</span>
+                                                <span>{formatDate(event?.startsAt)}</span>
                                             </div>
                                         </div>
                                         <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
-                                            {event.description}
+                                            {event?.description}
                                         </p>
                                     </div>
                                 </div>
@@ -251,7 +279,7 @@ export default function Checkout() {
                                                 <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">{bookingDetails.packageInfo}</span>
                                             </div>
                                             <div className="text-xs font-bold text-slate-700 mt-0.5">
-                                                {bookingDetails.pricePerTicket.toLocaleString("vi-VN")}đ <span className="text-slate-400 font-normal">/ vé</span>
+                                                {(bookingDetails.pricePerTicket || 0).toLocaleString("vi-VN")}đ <span className="text-slate-400 font-normal">/ vé</span>
                                             </div>
                                         </div>
                                     </div>
@@ -261,11 +289,11 @@ export default function Checkout() {
                                     </div>
                                     <div className="pt-3 sm:pt-0 sm:px-4">
                                         <span className="text-[11px] text-slate-400 block font-medium">Tổng tiền vé</span>
-                                        <span className="text-xs font-bold text-[#4353ff] mt-1 block">{totalAmount.toLocaleString("vi-VN")}đ</span>
+                                        <span className="text-xs font-bold text-[#4353ff] mt-1 block">{(totalAmount || 0).toLocaleString("vi-VN")}đ</span>
                                     </div>
                                     <div className="pt-3 sm:pt-0 sm:pl-4">
                                         <span className="text-[11px] text-slate-400 block font-medium">Khung giờ</span>
-                                        <span className="text-xs font-semibold text-slate-800 mt-1 block">{formatTime(event.startsAt)} - {formatTime(event.endsAt)}</span>
+                                        <span className="text-xs font-semibold text-slate-800 mt-1 block">{formatTime(event?.startsAt)} - {formatTime(event?.endsAt)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -419,7 +447,7 @@ export default function Checkout() {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
                                 </svg>
-                                Thanh toán ngay ({totalAmount.toLocaleString("vi-VN")}đ)
+                                Thanh toán ngay ({(totalAmount || 0).toLocaleString("vi-VN")}đ)
                                 <svg className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
                                 </svg>
@@ -454,11 +482,11 @@ export default function Checkout() {
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-500">Đơn giá</span>
-                                    <span className="font-bold text-slate-800">{bookingDetails.pricePerTicket.toLocaleString("vi-VN")}đ</span>
+                                    <span className="font-bold text-slate-800">{(bookingDetails.pricePerTicket || 0).toLocaleString("vi-VN")}đ</span>
                                 </div>
                                 <div className="pt-4 border-t border-slate-100 flex justify-between items-baseline">
                                     <span className="text-xs font-extrabold text-slate-800">Tổng thanh toán</span>
-                                    <span className="text-2xl font-black text-[#4353ff]">{totalAmount.toLocaleString("vi-VN")}đ</span>
+                                    <span className="text-2xl font-black text-[#4353ff]">{(totalAmount || 0).toLocaleString("vi-VN")}đ</span>
                                 </div>
                             </div>
 
