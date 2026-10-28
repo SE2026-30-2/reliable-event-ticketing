@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Generated build caches, reports and local helper files
+.vite/
+.cache/
+*.tsbuildinfo
+/tmp/
+/temp/
+/coverage/
+/.nyc_output/
+/playwright-report/
+/blob-report/
+/test-results/
+/playwright/.cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -23,11 +36,40 @@ dist-ssr
 *.sln
 *.sw?
 
-# Track the screen 14 fix report despite the repository-wide docs ignore.
-!/docs/
-/docs/*
-!/docs/screen-14-fixes-2026-10-17.md
-!/docs/screen-15-event-management.md
-/tmp/
-docs/
-tests/
+# Local documentation and tests are excluded from the runtime source upload.
+/docs/
+/SCREEN*.md
+/tests/
+/playwright*.config.*
+
+# Keep the login regression test and its standalone runner reviewable.
+!/playwright.auth.config.mjs
+!/tests/
+/tests/*
+!/tests/auth-login.spec.mjs
+
+# Keep the device administration regression suite reviewable.
+!/playwright.screen17.config.mjs
+!/tests/screen17.spec.mjs
+
+# Keep the payment administration regression suite reviewable.
+!/playwright.screen18.config.mjs
+!/tests/screen18.spec.mjs
+!/playwright.permissions.config.mjs
+!/tests/permissions.spec.mjs
+
+# Keep comprehensive QA runners and regression coverage reproducible.
+!/playwright.regression.config.mjs
+!/playwright.live.config.mjs
+!/playwright.screen13.config.mjs
+!/playwright.screen16.config.mjs
+!/playwright.config.mjs
+!/tests/authService.test.mjs
+!/tests/screen13.spec.mjs
+!/tests/screen13.test.mjs
+!/tests/screen15.spec.mjs
+!/tests/screen15.test.mjs
+!/tests/screen16.spec.mjs
+!/tests/live-backend.spec.mjs
+!/tests/live-cleanup.mjs
+!/tests/navigation.spec.mjs

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../contexts/useAuth'
+import Header from '../../components/layout/Header'
+import Footer from '../../components/layout/Footer'
 import { manageEventService, managementError } from '../../services/manageEventService'
 import './manage-events.css'
 
@@ -34,7 +35,6 @@ function localDate(iso) {
 }
 
 export default function ManageEvents({ preview = false }) {
-  const { user, logout } = useAuth()
   const [events, setEvents] = useState(preview ? previewEvents : [])
   const [loading, setLoading] = useState(!preview)
   const [loadError, setLoadError] = useState('')
@@ -151,14 +151,7 @@ export default function ManageEvents({ preview = false }) {
   }
 
   const canEdit = preview || (!loading && !loadError)
-  return <div className="manage-page">
-    <header className="manage-header">
-      <Link className="manage-brand" to="/"><span><Icon name="ticket" /></span>EventHub</Link>
-      <nav aria-label="Điều hướng chính"><Link to="/home">Trang chủ</Link><Link to="/home#events">Sự kiện</Link><Link to="/#features">Về chúng tôi</Link></nav>
-      <div className="manage-account"><button type="button" className="manage-icon-button" aria-label="Tìm kiếm sự kiện" onClick={() => searchInput.current?.focus()}><Icon name="search" /></button>
-        <details><summary><span className="manage-avatar">{(user?.name || user?.email || 'B').charAt(0).toUpperCase()}</span><span>Ban tổ chức</span><span aria-hidden="true">⌄</span></summary><div className="manage-account-menu"><span>{user?.email || 'Bản xem thử giao diện'}</span><Link to="/home">Trang chủ</Link>{!preview && <button type="button" onClick={logout}>Đăng xuất</button>}</div></details>
-      </div>
-    </header>
+  return <><Header onSearch={() => searchInput.current?.focus()} /><div className="manage-page">
     {preview && <div className="manage-preview-note">Bản xem thử • Dữ liệu minh họa, thay đổi chỉ tồn tại trong phiên xem này.</div>}
     <div className="manage-grid">
       <section className="manage-main" aria-labelledby="manage-title">
@@ -193,5 +186,5 @@ export default function ManageEvents({ preview = false }) {
       </aside>
     </div>
     <dialog ref={cancelDialog} className="manage-dialog" onCancel={(event) => { event.preventDefault(); if (!busy) setCancelTarget(null) }} aria-labelledby="cancel-title"><h2 id="cancel-title">Hủy sự kiện?</h2><p>Bạn có chắc muốn hủy “{cancelTarget?.name}”? Sự kiện đã hủy không thể xuất bản lại.</p><div><button autoFocus type="button" className="manage-button secondary" disabled={busy} onClick={() => setCancelTarget(null)}>Quay lại</button><button type="button" className="manage-button destructive" disabled={busy} onClick={cancelEvent}>{busy ? 'Đang hủy…' : 'Hủy sự kiện'}</button></div></dialog>
-  </div>
+  </div><Footer /></>
 }

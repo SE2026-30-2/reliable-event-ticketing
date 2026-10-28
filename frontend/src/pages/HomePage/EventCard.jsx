@@ -19,7 +19,7 @@ export default function EventCard({ event }) {
     return (
         <article className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col group">
             {/* Banner Ảnh */}
-            <Link to={`/events/${eventId}`} className="relative aspect-video w-full overflow-hidden bg-slate-100 block">
+            <Link to={`/event/${eventId}`} className="relative aspect-video w-full overflow-hidden bg-slate-100 block">
                 <img
                     alt={event.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -36,7 +36,7 @@ export default function EventCard({ event }) {
             {/* Thông tin sự kiện */}
             <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                 <div className="space-y-2.5">
-                    <Link to={`/events/${eventId}`}>
+                    <Link to={`/event/${eventId}`}>
                         <h3 className="font-bold text-slate-900 text-base leading-snug line-clamp-1 group-hover:text-[#4353ff] transition-colors">
                             {event.name}
                         </h3>
