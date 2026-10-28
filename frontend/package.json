@@ -4,6 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:unit": "node --test tests/authService.test.mjs tests/screen13.test.mjs tests/screen15.test.mjs",
+    "test:regression:browser": "playwright test --config playwright.regression.config.mjs",
+    "test:live:browser": "playwright test --config playwright.live.config.mjs",
+    "test:permissions:browser": "playwright test --config playwright.permissions.config.mjs",
+    "test:screen18:browser": "playwright test --config playwright.screen18.config.mjs",
     "test:screen17:browser": "playwright test --config playwright.screen17.config.mjs",
     "test:auth:browser": "playwright test --config playwright.auth.config.mjs",
     "test:screen13": "node --test tests/screen13.test.mjs",

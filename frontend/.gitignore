@@ -51,3 +51,25 @@ dist-ssr
 # Keep the device administration regression suite reviewable.
 !/playwright.screen17.config.mjs
 !/tests/screen17.spec.mjs
+
+# Keep the payment administration regression suite reviewable.
+!/playwright.screen18.config.mjs
+!/tests/screen18.spec.mjs
+!/playwright.permissions.config.mjs
+!/tests/permissions.spec.mjs
+
+# Keep comprehensive QA runners and regression coverage reproducible.
+!/playwright.regression.config.mjs
+!/playwright.live.config.mjs
+!/playwright.screen13.config.mjs
+!/playwright.screen16.config.mjs
+!/playwright.config.mjs
+!/tests/authService.test.mjs
+!/tests/screen13.spec.mjs
+!/tests/screen13.test.mjs
+!/tests/screen15.spec.mjs
+!/tests/screen15.test.mjs
+!/tests/screen16.spec.mjs
+!/tests/live-backend.spec.mjs
+!/tests/live-cleanup.mjs
+!/tests/navigation.spec.mjs
