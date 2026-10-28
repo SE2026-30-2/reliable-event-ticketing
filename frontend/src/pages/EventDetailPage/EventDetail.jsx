@@ -1,35 +1,64 @@
-import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom"; // Bổ sung useNavigate
+import { useState, useEffect, useMemo } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
+import { useAuth } from "../../contexts/useAuth";
 import { eventService } from "../../services/eventService.js";
 
-export default function EventDetail() {
+export default function EventDetail({ currentUser: propUser }) {
+    const { user: authUser } = useAuth();
+    const currentUser = propUser || authUser;
     const { eventId } = useParams();
-    const navigate = useNavigate(); // Hook chuyển trang
+    const navigate = useNavigate();
 
+    // Event & Ticket Types Data States
     const [event, setEvent] = useState(null);
+    const [ticketTypes, setTicketTypes] = useState([]);
+    const [selectedTicketId, setSelectedTicketId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    // State quản lý Tab đang chọn (overview | program | venue | terms)
+    // Active Tab (overview | program | venue | terms)
     const [activeTab, setActiveTab] = useState("overview");
 
-    // States hỗ trợ đặt vé
-    const [selectedTicket, setSelectedTicket] = useState("VIP");
+    // Form & Booking States
     const [quantity, setQuantity] = useState(1);
-    const [coupon, setCoupon] = useState("EVENT10");
-    const [isCouponApplied, setIsCouponApplied] = useState(true);
+    const [couponInput, setCouponInput] = useState("");
+    const [appliedCoupon, setAppliedCoupon] = useState("");
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [bannerFailed, setBannerFailed] = useState(false);
 
+    // Dynamic Quote & Submitting States
+    const [quote, setQuote] = useState(null);
+    const [loadingQuote, setLoadingQuote] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    // Helper: Chuyển đổi priceCents từ backend sang VNĐ
+    const getTicketPrice = (ticket) => {
+        if (!ticket) return 0;
+        if (ticket.priceCents !== undefined && ticket.priceCents !== null) {
+            return ticket.priceCents / 100;
+        }
+        return ticket.price || 0;
+    };
+
+    // 1. Fetch Event Info & Ticket Types list
     useEffect(() => {
-        const fetchEventDetail = async () => {
+        const fetchEventData = async () => {
             setLoading(true);
             try {
-                const data = await eventService.getEventById(eventId);
-                setEvent(data);
+                const [eventData, ticketsData] = await Promise.all([
+                    eventService.getEventById(eventId),
+                    eventService.getTicketTypesByEventId(eventId)
+                ]);
+                setEvent(eventData);
+
+                const list = ticketsData || [];
+                setTicketTypes(list);
+                if (list.length > 0) {
+                    setSelectedTicketId(list[0].ticketTypeId || list[0].id);
+                }
             } catch (err) {
                 console.error("Lỗi khi tải thông tin sự kiện:", err);
                 setError("Không thể tải thông tin sự kiện. Vui lòng thử lại sau.");
@@ -39,52 +68,162 @@ export default function EventDetail() {
         };
 
         if (eventId) {
-            fetchEventDetail();
+            fetchEventData();
         }
     }, [eventId]);
 
+    // Active Ticket Type Object
+    const selectedTicket = useMemo(() => {
+        return ticketTypes.find((t) => (t.ticketTypeId || t.id) === selectedTicketId) || null;
+    }, [ticketTypes, selectedTicketId]);
+
+    // Check if item is out of stock for current quantity
+    const isWaitlistMode = useMemo(() => {
+        if (!selectedTicket) return false;
+        return (selectedTicket.remaining ?? 0) < quantity;
+    }, [selectedTicket, quantity]);
+
+    // 2. Fetch Realtime Quote via API (GET /api/ticket-types/:id/quote)
+    const fetchQuote = async (ticketTypeId, qty, couponCode) => {
+        if (!ticketTypeId) return;
+        setLoadingQuote(true);
+        try {
+            const quoteData = await eventService.getTicketQuote(ticketTypeId, qty, couponCode);
+
+            if (quoteData) {
+                // Quy đổi từ Cents sang VNĐ (chia 100)
+                const grossVnd = (quoteData.grossCents ?? 0) / 100;
+                const discountVnd = (quoteData.discountCents ?? 0) / 100;
+                const totalVnd = (quoteData.totalCents ?? 0) / 100;
+
+                // Nếu API trả về dữ liệu hợp lệ (> 0)
+                if (grossVnd > 0 || totalVnd > 0) {
+                    setQuote({
+                        originalPrice: grossVnd,
+                        discountAmount: discountVnd,
+                        finalPrice: totalVnd,
+                    });
+                    return;
+                }
+            }
+            throw new Error("Báo giá từ API bằng 0, chuyển sang fallback client.");
+        } catch (err) {
+            console.warn("Lỗi khi lấy báo giá từ server, sử dụng fallback client:", err);
+            // Fallback tính toán tại Client nếu API gặp sự cố
+            if (selectedTicket) {
+                const unitPrice = getTicketPrice(selectedTicket);
+                const originalTotal = unitPrice * qty;
+                const discount = couponCode ? originalTotal * 0.1 : 0;
+
+                setQuote({
+                    originalPrice: originalTotal,
+                    discountAmount: discount,
+                    finalPrice: originalTotal - discount,
+                });
+            }
+        } finally {
+            setLoadingQuote(false);
+        }
+    };
+
+    // Recalculate Quote when ticket, quantity, or applied coupon changes
+    useEffect(() => {
+        if (selectedTicketId) {
+            fetchQuote(selectedTicketId, quantity, appliedCoupon);
+        }
+    }, [selectedTicketId, quantity, appliedCoupon]);
+
+    // Auto-fill user info if logged in
+    useEffect(() => {
+        if (currentUser) {
+            setFullName((prev) => prev || currentUser.fullName || currentUser.name || "");
+            setEmail((prev) => prev || currentUser.email || "");
+        }
+    }, [currentUser]);
+
     const formatDate = (dateString) => {
         if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleDateString("vi-VN", {
+        return new Date(dateString).toLocaleDateString("vi-VN", {
             day: "2-digit",
             month: "2-digit",
-            year: "numeric",
+            year: "numeric"
         });
     };
 
     const formatTime = (dateString) => {
         if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleTimeString("vi-VN", {
+        return new Date(dateString).toLocaleTimeString("vi-VN", {
             hour: "2-digit",
-            minute: "2-digit",
+            minute: "2-digit"
         });
     };
 
-    // Hàm xử lý khi bấm Đặt vé & Thanh toán
-    const handleBooking = () => {
+    const handleApplyCoupon = () => {
+        setAppliedCoupon(couponInput.trim());
+    };
+
+    // 3. Main Action Handler: Reservation or Waitlist
+    const handleAction = async () => {
+        if (!currentUser) {
+            alert("Vui lòng đăng nhập để thực hiện đặt vé hoặc tham gia danh sách chờ!");
+            navigate("/login", { state: { from: `/event/${eventId}` } });
+            return;
+        }
+
+        const isEmailVerified = currentUser.emailVerified ?? currentUser.isEmailVerified;
+        if (isEmailVerified === false) {
+            alert("Tài khoản của bạn chưa xác minh Email. Vui lòng kiểm tra email xác minh trước khi tiếp tục!");
+            return;
+        }
+
         if (!fullName.trim() || !email.trim()) {
             alert("Vui lòng nhập đầy đủ Họ tên và Email người nhận vé!");
             return;
         }
 
-        const basePrice = selectedTicket === "VIP" ? 2500000 : 1200000;
-        const discountRate = isCouponApplied ? 0.1 : 0;
-        const pricePerTicket = basePrice * (1 - discountRate);
+        setSubmitting(true);
+        try {
+            if (isWaitlistMode) {
+                // Call Waitlist API: POST /api/ticket-types/:id/waitlist
+                await eventService.joinWaitlist(selectedTicketId, {
+                    quantity,
+                    holderName: fullName,
+                    holderEmail: email
+                });
+                alert("Bạn đã tham gia danh sách chờ thành công! Chúng tôi sẽ thông báo qua Email khi có vé.");
+            } else {
+                // Call Reservation API: POST /api/ticket-types/:id/reservations
+                const reservation = await eventService.createReservation(selectedTicketId, {
+                    quantity,
+                    holderName: fullName,
+                    holderEmail: email,
+                    couponCode: appliedCoupon
+                });
 
-        // Chuyển sang trang Checkout và đính kèm state
-        navigate(`/checkout/${eventId}`, {
-            state: {
-                ticketType: selectedTicket,
-                packageInfo: selectedTicket === "VIP" ? "Gói 2 ngày" : "Vé thường",
-                quantity,
-                pricePerTicket,
-                customerName: fullName,
-                customerEmail: email,
-                couponCode: isCouponApplied ? coupon : "",
-            },
-        });
+                const fallbackPrice = getTicketPrice(selectedTicket) * quantity;
+
+                // Navigate to Checkout Page
+                navigate(`/checkout/${reservation.id || eventId}`, {
+                    state: {
+                        reservationId: reservation.id,
+                        ticketType: selectedTicket,
+                        quantity,
+                        holderName: fullName,
+                        holderEmail: email,
+                        quote: quote || {
+                            originalPrice: fallbackPrice,
+                            discountAmount: 0,
+                            finalPrice: fallbackPrice
+                        }
+                    }
+                });
+            }
+        } catch (err) {
+            console.error("Thao tác thất bại:", err);
+            alert(err.response?.data?.message || "Đã xảy ra lỗi trong quá trình xử lý. Vui lòng thử lại!");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     if (loading) {
@@ -123,7 +262,7 @@ export default function EventDetail() {
             <Header />
 
             <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 flex-1">
-                {/* HERO BANNER */}
+                {/* HERO BANNER LỚN */}
                 <section className="relative bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
                     <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[380px] relative">
                         <div className="lg:col-span-7 p-8 lg:p-10 flex flex-col justify-between z-10 bg-gradient-to-r from-white via-white/95 to-transparent">
@@ -160,474 +299,252 @@ export default function EventDetail() {
                                     {event.description}
                                 </p>
                             </div>
-
-                            <div className="flex flex-wrap items-center gap-3 pt-6">
-                                <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                    </svg>
-                                    Nghệ sĩ khách mời
-                                </span>
-                                <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                    <svg className="w-3.5 h-3.5 fill-[#4353ff] text-[#4353ff]" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                                    </svg>
-                                    Sân khấu trải nghiệm
-                                </span>
-                            </div>
                         </div>
 
                         <div className="lg:col-span-5 relative min-h-[300px] lg:min-h-full overflow-hidden hero-mask">
-                            {!bannerFailed && event.bannerUrl ? <img
-                                alt={event.name}
-                                className="w-full h-full object-cover object-center scale-105"
-                                src={event.bannerUrl}
-                                onError={() => setBannerFailed(true)}
-                            /> : <div role="img" aria-label={`Ảnh bìa mặc định cho ${event.name}`} className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-br from-indigo-500 via-violet-700 to-slate-950 text-white">
-                                <svg className="w-24 h-24 -rotate-12 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 4h16v5a3 3 0 0 0 0 6v5H4v-5a3 3 0 0 0 0-6V4Zm8 0v3m0 3v4m0 3v3" /></svg>
-                                <span className="text-3xl font-extrabold tracking-tight">EventHub</span>
-                            </div>}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent lg:hidden"></div>
-                        </div>
-
-                        <div className="absolute top-5 right-5 z-20 flex items-center gap-2.5">
-                            <button
-                                aria-label="Chia sẻ"
-                                className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-md shadow hover:bg-white text-slate-700 flex items-center justify-center transition-all"
-                                type="button"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                </svg>
-                            </button>
-                            <button
-                                aria-label="Yêu thích"
-                                className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-md shadow hover:bg-white text-[#4353ff] flex items-center justify-center transition-all"
-                                type="button"
-                            >
-                                <svg className="w-4 h-4 fill-[#4353ff]" viewBox="0 0 24 24">
-                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
-                                </svg>
-                            </button>
+                            {!bannerFailed && event.bannerUrl ? (
+                                <img
+                                    alt={event.name}
+                                    className="w-full h-full object-cover object-center scale-105"
+                                    src={event.bannerUrl}
+                                    onError={() => setBannerFailed(true)}
+                                />
+                            ) : (
+                                <div role="img" aria-label={`Ảnh bìa mặc định cho ${event.name}`} className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-br from-indigo-500 via-violet-700 to-slate-950 text-white">
+                                    <svg className="w-24 h-24 -rotate-12 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+                                        <path d="M4 4h16v5a3 3 0 0 0 0 6v5H4v-5a3 3 0 0 0 0-6V4Zm8 0v3m0 3v4m0 3v3" />
+                                    </svg>
+                                    <span className="text-3xl font-extrabold tracking-tight">EventHub</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </section>
 
                 {/* MAIN CONTENT GRID */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    {/* Left Column: Details & Tabs */}
+                    {/* Left Column: Event Tabs Details */}
                     <section className="lg:col-span-7 space-y-6">
                         <nav className="flex items-center gap-8 border-b border-slate-200 text-sm font-semibold text-slate-500">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("overview")}
-                                className={`pb-3 border-b-2 transition-all ${
-                                    activeTab === "overview"
-                                        ? "border-[#4353ff] text-[#4353ff] font-bold"
-                                        : "border-transparent hover:text-slate-900"
-                                }`}
-                            >
-                                Tổng quan
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("program")}
-                                className={`pb-3 border-b-2 transition-all ${
-                                    activeTab === "program"
-                                        ? "border-[#4353ff] text-[#4353ff] font-bold"
-                                        : "border-transparent hover:text-slate-900"
-                                }`}
-                            >
-                                Nội dung chương trình
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("venue")}
-                                className={`pb-3 border-b-2 transition-all ${
-                                    activeTab === "venue"
-                                        ? "border-[#4353ff] text-[#4353ff] font-bold"
-                                        : "border-transparent hover:text-slate-900"
-                                }`}
-                            >
-                                Địa điểm
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("terms")}
-                                className={`pb-3 border-b-2 transition-all ${
-                                    activeTab === "terms"
-                                        ? "border-[#4353ff] text-[#4353ff] font-bold"
-                                        : "border-transparent hover:text-slate-900"
-                                }`}
-                            >
-                                Điều khoản
-                            </button>
+                            {["overview", "program", "venue", "terms"].map((tab) => (
+                                <button
+                                    key={tab}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`pb-3 border-b-2 capitalize transition-all ${
+                                        activeTab === tab
+                                            ? "border-[#4353ff] text-[#4353ff] font-bold"
+                                            : "border-transparent hover:text-slate-900"
+                                    }`}
+                                >
+                                    {tab === "overview" && "Tổng quan"}
+                                    {tab === "program" && "Nội dung chương trình"}
+                                    {tab === "venue" && "Địa điểm"}
+                                    {tab === "terms" && "Điều khoản"}
+                                </button>
+                            ))}
                         </nav>
 
-                        {/* 1. Tab: Tổng quan */}
+                        {/* Tab Content */}
                         {activeTab === "overview" && (
-                            <div className="space-y-6">
-                                <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
-                                    <div className="flex items-center gap-2.5 text-slate-900">
-                                        <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#4353ff] flex items-center justify-center">
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                            </svg>
-                                        </div>
-                                        <h2 className="text-lg font-bold">Giới thiệu sự kiện</h2>
-                                    </div>
-                                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                                        {event.description}
-                                    </p>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                                        <div className="flex items-center gap-3.5 p-3 rounded-xl bg-slate-50/70">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-100/70 text-[#4353ff] flex items-center justify-center shrink-0">
-                                                <svg className="w-5 h-5 fill-[#4353ff]" viewBox="0 0 20 20">
-                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                                                </svg>
-                                            </div>
-                                            <span className="text-xs font-semibold text-slate-700 leading-tight">Dàn nghệ sĩ hàng đầu</span>
-                                        </div>
-                                        <div className="flex items-center gap-3.5 p-3 rounded-xl bg-slate-50/70">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-100/70 text-[#4353ff] flex items-center justify-center shrink-0">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                                </svg>
-                                            </div>
-                                            <span className="text-xs font-semibold text-slate-700 leading-tight">Âm thanh ánh sáng đỉnh cao</span>
-                                        </div>
-                                        <div className="flex items-center gap-3.5 p-3 rounded-xl bg-slate-50/70">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-100/70 text-[#4353ff] flex items-center justify-center shrink-0">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                                </svg>
-                                            </div>
-                                            <span className="text-xs font-semibold text-slate-700 leading-tight">Trải nghiệm đáng nhớ</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 flex items-start gap-3">
-                                    <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">
-                                        i
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-slate-600">
-                                        <span className="font-bold text-slate-800">Lưu ý:</span> Sự kiện dành cho mọi đối tượng. Vui lòng mang theo CCCD/CMND để check-in.
-                                    </p>
-                                </div>
+                            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
+                                <h2 className="text-lg font-bold text-slate-900">Giới thiệu sự kiện</h2>
+                                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{event.description}</p>
                             </div>
                         )}
-
-                        {/* 2. Tab: Nội dung chương trình */}
                         {activeTab === "program" && (
                             <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2.5 text-slate-900 mb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#4353ff] flex items-center justify-center">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                        </svg>
-                                    </div>
-                                    <h2 className="text-lg font-bold">Lịch trình chương trình</h2>
-                                </div>
-
-                                <div className="border-l-2 border-indigo-200 ml-4 pl-4 space-y-6">
-                                    <div className="relative">
-                                        <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-[#4353ff] border-2 border-white"></div>
-                                        <span className="text-xs font-bold text-[#4353ff] uppercase tracking-wider">{formatTime(event.startsAt)}</span>
-                                        <h4 className="text-sm font-bold text-slate-800">Đón khách & Check-in</h4>
-                                        <p className="text-xs text-slate-500 mt-0.5">Kiểm tra vé, quét mã QR và hướng dẫn vị trí chỗ ngồi.</p>
-                                    </div>
-                                    <div className="relative">
-                                        <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-[#4353ff] border-2 border-white"></div>
-                                        <span className="text-xs font-bold text-[#4353ff] uppercase tracking-wider">Khai mạc</span>
-                                        <h4 className="text-sm font-bold text-slate-800">Biểu diễn mở màn & Phát biểu</h4>
-                                        <p className="text-xs text-slate-500 mt-0.5">Giới thiệu ban tổ chức, nhà tài trợ và các tiết mục nổi bật.</p>
-                                    </div>
-                                    <div className="relative">
-                                        <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-[#4353ff] border-2 border-white"></div>
-                                        <span className="text-xs font-bold text-[#4353ff] uppercase tracking-wider">{formatTime(event.endsAt)}</span>
-                                        <h4 className="text-sm font-bold text-slate-800">Kết thúc chương trình</h4>
-                                        <p className="text-xs text-slate-500 mt-0.5">Giao lưu nghệ sĩ và bế mạc sự kiện.</p>
-                                    </div>
-                                </div>
+                                <h2 className="text-lg font-bold text-slate-900">Lịch trình chương trình</h2>
+                                <p className="text-sm text-slate-600">{event.programDetails || "Chương trình đang được cập nhật."}</p>
                             </div>
                         )}
-
-                        {/* 3. Tab: Địa điểm */}
                         {activeTab === "venue" && (
                             <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2.5 text-slate-900">
-                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#4353ff] flex items-center justify-center">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                            <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                        </svg>
-                                    </div>
-                                    <h2 className="text-lg font-bold">Vị trí tổ chức</h2>
-                                </div>
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 rounded-xl border border-slate-100 gap-4 bg-slate-50/40">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-indigo-100 text-[#4353ff] flex items-center justify-center shrink-0">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                            </svg>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <h3 className="text-sm font-bold text-slate-800">{event.venue}</h3>
-                                            <p className="text-xs text-slate-500">Xem bản đồ chỉ đường đến địa điểm sự kiện</p>
-                                        </div>
-                                    </div>
-                                    <a
-                                        className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-[#4353ff] hover:underline py-2 sm:py-0 whitespace-nowrap"
-                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue)}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        Xem bản đồ
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                        </svg>
-                                    </a>
-                                </div>
+                                <h2 className="text-lg font-bold text-slate-900">Địa điểm tổ chức</h2>
+                                <p className="text-sm font-semibold text-slate-800">{event.venue}</p>
                             </div>
                         )}
-
-                        {/* 4. Tab: Điều khoản */}
                         {activeTab === "terms" && (
                             <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2.5 text-slate-900">
-                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#4353ff] flex items-center justify-center">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                        </svg>
-                                    </div>
-                                    <h2 className="text-lg font-bold">Quy định & Điều khoản tham gia</h2>
-                                </div>
-                                <ul className="list-disc list-inside text-xs sm:text-sm text-slate-600 space-y-2 leading-relaxed">
-                                    <li>Vé đã mua không hỗ trợ hoàn tiền hoặc hủy dưới mọi hình thức.</li>
-                                    <li>Khán giả vui lòng xuất trình mã QR điện tử hoặc vé cứng hợp lệ tại cổng soát vé.</li>
-                                    <li>Không mang theo vũ khí, chất cháy nổ hoặc chất cấm vào khu vực tổ chức.</li>
-                                    <li>Ban tổ chức có quyền từ chối sự tham gia của các cá nhân không tuân thủ quy định chung.</li>
+                                <h2 className="text-lg font-bold text-slate-900">Quy định & Điều khoản</h2>
+                                <ul className="list-disc list-inside text-sm text-slate-600 space-y-2">
+                                    <li>Vé đã mua không hỗ trợ hoàn tiền hoặc hủy.</li>
+                                    <li>Mang theo mã QR hợp lệ để check-in tại cổng.</li>
                                 </ul>
                             </div>
                         )}
                     </section>
 
-                    {/* Right Column: Sticky Booking Widget */}
+                    {/* Right Column: Dynamic Ticket Selector & Booking Widget */}
                     <aside className="lg:col-span-5">
                         <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-100 shadow-xl shadow-slate-100/70 space-y-6 sticky top-28">
-                            <div className="flex items-center gap-2.5 pb-2">
-                                <div className="w-8 h-8 rounded-xl bg-[#4353ff] text-white flex items-center justify-center shadow-sm">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                    </svg>
-                                </div>
-                                <h3 className="text-base font-extrabold text-slate-900">Chọn loại vé</h3>
-                            </div>
+                            <h3 className="text-base font-extrabold text-slate-900">Chọn loại vé</h3>
 
+                            {/* Ticket Types List / Selector */}
                             <div className="space-y-3">
-                                <div
-                                    onClick={() => setSelectedTicket("VIP")}
-                                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                                        selectedTicket === "VIP"
-                                            ? "border-[#4353ff] bg-indigo-50/20"
-                                            : "border-slate-200 hover:border-slate-300"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-[#4353ff] text-white flex items-center justify-center">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold text-slate-900">VIP</span>
-                                                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Trọn gói</span>
-                                                </div>
-                                                <div className="text-sm font-extrabold text-[#4353ff] mt-0.5">2.500.000đ</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-right">
-                                                <span className="text-xs text-slate-400">Còn lại: </span>
-                                                <span className="text-xs font-bold text-emerald-600">120</span>
-                                            </div>
-                                            {selectedTicket === "VIP" && (
-                                                <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center">
-                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
-                                                    </svg>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                {ticketTypes.length === 0 ? (
+                                    <p className="text-xs text-slate-500">Chưa có thông tin vé cho sự kiện này.</p>
+                                ) : (
+                                    ticketTypes.map((ticket) => {
+                                        const ticketId = ticket.ticketTypeId || ticket.id;
+                                        const isSelected = selectedTicketId === ticketId;
+                                        const priceVnd = getTicketPrice(ticket);
 
-                                <div
-                                    onClick={() => setSelectedTicket("STD")}
-                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                                        selectedTicket === "STD"
-                                            ? "border-2 border-[#4353ff] bg-indigo-50/20"
-                                            : "border-slate-200 hover:border-slate-300 bg-white"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold text-slate-900">Standard</span>
-                                                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Vé thường</span>
+                                        return (
+                                            <div
+                                                key={ticketId}
+                                                onClick={() => setSelectedTicketId(ticketId)}
+                                                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                                    isSelected ? "border-[#4353ff] bg-indigo-50/20" : "border-slate-200 hover:border-slate-300"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="space-y-1">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span className="text-sm font-bold text-slate-900">{ticket.name}</span>
+                                                            {ticket.bundleSize > 1 && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                                                    Gói {ticket.bundleSize} vé
+                                                                </span>
+                                                            )}
+                                                            {ticket.maxEntries > 1 && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                                                    {ticket.maxEntries} lượt vào
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Hiển thị giá VNĐ an toàn */}
+                                                        <div className="text-sm font-extrabold text-[#4353ff]">
+                                                            {priceVnd === 0 ? "Miễn phí" : `${priceVnd.toLocaleString("vi-VN")}đ`}
+                                                        </div>
+
+                                                        {/* Hiển thị khung giờ Check-in */}
+                                                        {(ticket.validFrom || ticket.checkInWindow) && (
+                                                            <div className="text-[11px] text-slate-500">
+                                                                Check-in: {ticket.checkInWindow || `${formatTime(ticket.validFrom)} - ${formatTime(ticket.validUntil)}`}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-xs text-slate-400">Còn lại: </span>
+                                                        <span className={`text-xs font-bold ${(ticket.remaining ?? 0) > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                                            {ticket.remaining ?? 0}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="text-sm font-extrabold text-slate-800 mt-0.5">1.200.000đ</div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-right">
-                                                <span className="text-xs text-slate-400">Còn lại: </span>
-                                                <span className="text-xs font-bold text-slate-700">350</span>
-                                            </div>
-                                            {selectedTicket === "STD" && (
-                                                <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center">
-                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
-                                                    </svg>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                        );
+                                    })
+                                )}
                             </div>
 
+                            {/* Coupon Code Input & Realtime Pricing */}
                             <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100 space-y-2">
                                 <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
-                                            <svg className="w-4 h-4 text-[#4353ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                            </svg>
-                                        </span>
-                                        <input
-                                            className="w-full pl-9 pr-3 py-2 text-xs uppercase tracking-wider font-bold bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                            type="text"
-                                            value={coupon}
-                                            onChange={(e) => setCoupon(e.target.value)}
-                                        />
-                                    </div>
+                                    <input
+                                        className="w-full pl-3 pr-3 py-2 text-xs uppercase font-bold bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500"
+                                        type="text"
+                                        placeholder="MÃ GIẢM GIÁ"
+                                        value={couponInput}
+                                        onChange={(e) => setCouponInput(e.target.value)}
+                                    />
                                     <button
-                                        onClick={() => setIsCouponApplied(true)}
-                                        className="px-5 py-2 rounded-xl bg-[#4353ff] hover:bg-indigo-700 text-white font-semibold text-xs transition-colors"
+                                        onClick={handleApplyCoupon}
+                                        className="px-4 py-2 rounded-xl bg-[#4353ff] text-white font-semibold text-xs hover:bg-indigo-700 transition"
                                         type="button"
                                     >
                                         Áp dụng
                                     </button>
                                 </div>
-                                {isCouponApplied && (
-                                    <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
-                                        </svg>
-                                        Coupon hợp lệ! Giảm 10%
-                                    </p>
-                                )}
                             </div>
 
-                            <div className="space-y-4 pt-1">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Thông tin đặt vé</h4>
+                            {/* Quantity & Pricing Summary */}
+                            <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-xs font-semibold text-slate-600 block mb-1.5">Số lượng</span>
+                                        <span className="text-xs font-semibold text-slate-600 block mb-1">Số lượng (1 - 10)</span>
                                         <div className="flex items-center border border-slate-200 rounded-xl bg-white p-1">
                                             <button
-                                                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 font-bold"
+                                                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 font-bold hover:bg-slate-100"
                                                 type="button"
                                             >
                                                 -
                                             </button>
                                             <span className="w-9 text-center text-xs font-bold text-slate-800">{quantity}</span>
                                             <button
-                                                onClick={() => setQuantity(quantity + 1)}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 font-bold"
+                                                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 font-bold hover:bg-slate-100"
                                                 type="button"
                                             >
                                                 +
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="text-right space-y-1">
-                                        <div className="text-xs text-slate-400">
-                                            Tổng gốc: <span className="font-medium text-slate-600 line-through">{((selectedTicket === "VIP" ? 2500000 : 1200000) * quantity).toLocaleString("vi-VN")}đ</span>
-                                        </div>
-                                        {isCouponApplied && (
-                                            <div className="text-xs text-emerald-600 font-semibold flex items-center justify-end gap-1">
-                                                Giảm giá (-10%): <span>{((selectedTicket === "VIP" ? 2500000 : 1200000) * quantity * 0.1).toLocaleString("vi-VN")}đ</span>
-                                            </div>
-                                        )}
-                                        <div className="text-xl font-extrabold text-[#4353ff] tracking-tight">
-                                            {(((selectedTicket === "VIP" ? 2500000 : 1200000) * (isCouponApplied ? 0.9 : 1)) * quantity).toLocaleString("vi-VN")}đ
-                                        </div>
+                                    <div className="text-right">
+                                        {loadingQuote ? (
+                                            <span className="text-xs text-slate-400">Đang tính toán...</span>
+                                        ) : quote ? (
+                                            <>
+                                                <div className="text-xs text-slate-400 line-through">
+                                                    {(quote.originalPrice || 0).toLocaleString("vi-VN")}đ
+                                                </div>
+                                                {quote.discountAmount > 0 && (
+                                                    <div className="text-xs text-emerald-600 font-semibold">
+                                                        Giảm: -{(quote.discountAmount || 0).toLocaleString("vi-VN")}đ
+                                                    </div>
+                                                )}
+                                                <div className="text-xl font-extrabold text-[#4353ff]">
+                                                    {quote.finalPrice === 0 ? "0đ (Miễn phí)" : `${(quote.finalPrice || 0).toLocaleString("vi-VN")}đ`}
+                                                </div>
+                                            </>
+                                        ) : null}
                                     </div>
                                 </div>
 
+                                {/* Form Receiver Info */}
                                 <div className="space-y-3 pt-2">
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Thông tin người nhận vé</h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                                                Họ tên <span className="text-red-500">*</span>
-                                            </label>
-                                            <input
-                                                className="w-full text-xs font-medium px-3 py-2 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                type="text"
-                                                placeholder="Nguyễn Văn A"
-                                                value={fullName}
-                                                onChange={(e) => setFullName(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                                                Email <span className="text-red-500">*</span>
-                                            </label>
-                                            <input
-                                                className="w-full text-xs font-medium px-3 py-2 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                type="email"
-                                                placeholder="nguyenvana@example.com"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                            />
-                                        </div>
+                                    <div className="space-y-2">
+                                        <input
+                                            className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500"
+                                            type="text"
+                                            placeholder="Họ và tên (holderName) *"
+                                            value={fullName}
+                                            onChange={(e) => setFullName(e.target.value)}
+                                        />
+                                        <input
+                                            className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500"
+                                            type="email"
+                                            placeholder="Email (holderEmail) *"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                        />
                                     </div>
                                 </div>
 
-                                {/* Nút đặt vé đã được gắn onClick={handleBooking} */}
+                                {/* Action Button (Dynamic: Reservation / Free / Waitlist) */}
                                 <button
-                                    onClick={handleBooking}
-                                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#4353ff] to-indigo-600 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all group"
+                                    onClick={handleAction}
+                                    disabled={submitting || !selectedTicket}
+                                    className={`w-full py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
+                                        isWaitlistMode
+                                            ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/25"
+                                            : "bg-gradient-to-r from-[#4353ff] to-indigo-600 hover:from-indigo-700 hover:to-indigo-800 shadow-indigo-500/25"
+                                    }`}
                                     type="button"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                    </svg>
-                                    <span>Đặt vé &amp; Thanh toán</span>
-                                    <svg className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                    </svg>
+                                    {submitting ? (
+                                        "Đang xử lý..."
+                                    ) : isWaitlistMode ? (
+                                        "Tham gia danh sách chờ (Join Waitlist)"
+                                    ) : quote?.finalPrice === 0 ? (
+                                        "Đặt vé miễn phí"
+                                    ) : (
+                                        "Đặt vé & Thanh toán"
+                                    )}
                                 </button>
-
-                                <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400 pt-1">
-                                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                                    </svg>
-                                    <span>Thanh toán an toàn • Hỗ trợ nhiều phương thức</span>
-                                </div>
                             </div>
                         </div>
                     </aside>
