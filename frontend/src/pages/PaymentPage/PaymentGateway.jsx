@@ -131,7 +131,7 @@ export default function PaymentGateway() {
                             </div>
 
                             <div className="text-center space-y-1">
-                                <p className="text-xs font-bold text-slate-700">Số tiền: <span className="text-base font-black text-[#4353ff]">{bookingData.totalAmount.toLocaleString("vi-VN")}đ</span></p>
+                                <p className="text-xs font-bold text-slate-700">Số tiền: <span className="text-base font-black text-[#4353ff]">{(bookingData.totalAmount || 0).toLocaleString("vi-VN")}đ</span></p>
                                 <p className="text-[11px] text-slate-400 font-mono">Nội dung CK: <span className="font-bold text-slate-700">{bookingData.orderCode}</span></p>
                             </div>
                         </div>
@@ -215,7 +215,7 @@ export default function PaymentGateway() {
 
                                 <div className="pt-4 border-t border-slate-100 flex justify-between items-baseline">
                                     <span className="text-xs font-extrabold text-slate-800">Tổng tiền</span>
-                                    <span className="text-xl font-black text-[#4353ff]">{bookingData.totalAmount.toLocaleString("vi-VN")}đ</span>
+                                    <span className="text-xl font-black text-[#4353ff]">{(bookingData.totalAmount || 0).toLocaleString("vi-VN")}đ</span>
                                 </div>
                             </div>
                         </div>
