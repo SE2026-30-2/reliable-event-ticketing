@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Expo: Start (Expo Go)",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "start", "--", "--go"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Expo: Web",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "web"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Expo: Doctor",
+      "type": "shell",
+      "command": "npx.cmd",
+      "args": ["--yes", "expo-doctor"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "TypeScript: Check",
+      "type": "shell",
+      "command": "npx.cmd",
+      "args": ["tsc", "--noEmit"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$tsc"]
+    }
+  ]
+}
