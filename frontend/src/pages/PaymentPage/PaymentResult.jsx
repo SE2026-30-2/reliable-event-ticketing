@@ -1,45 +1,122 @@
 import { useState, useEffect } from "react";
-import { useLocation, Link, useNavigate } from "react-router-dom";
+import { useLocation, useSearchParams, Link, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
+import { paymentService } from "../../services/paymentService";
+import { ticketService } from "../../services/ticketService";
+
+function formatVnd(cents) {
+    if (!cents && cents !== 0) return "0đ";
+    return Math.round(cents / 100).toLocaleString("vi-VN") + "đ";
+}
 
 export default function PaymentResult() {
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
-    const queryParams = new URLSearchParams(location.search);
-    const vnpResponseCode = queryParams.get("vnp_ResponseCode");
+    // -----------------------------------------------------------------------
+    // Đọc parameters từ VNPay Callback URL hoặc state điều hướng
+    // -----------------------------------------------------------------------
+    const vnpTxnRef = searchParams.get("vnp_TxnRef");
+    const vnpResponseCode = searchParams.get("vnp_ResponseCode");
+    const locationState = location.state || {};
 
-    const getInitialState = () => {
-        if (location.state?.status) {
-            return location.state.status; // 'success' | 'failed' | 'expired'
+    const [status, setStatus] = useState("loading"); // "loading" | "success" | "failed" | "expired"
+    const [payment, setPayment] = useState(null);
+    const [issuedTickets, setIssuedTickets] = useState(locationState.tickets || []);
+    const [isResending, setIsResending] = useState(false);
+    const [feedbackMsg, setFeedbackMsg] = useState("");
+
+    // -----------------------------------------------------------------------
+    // Đồng bộ và đối soát trạng thái giao dịch
+    // -----------------------------------------------------------------------
+    useEffect(() => {
+        // 1. Nếu đi từ MOCK / FREE (đã có state.status)
+        if (locationState.status) {
+            setStatus(locationState.status);
+            return;
         }
-        if (vnpResponseCode) {
-            if (vnpResponseCode === "00") return "success";
-            if (vnpResponseCode === "11" || vnpResponseCode === "24") return "expired"; // Quá hạn hoặc Hủy
-            return "failed";
+
+        // 2. Nếu Redirect từ VNPay callback URL (?vnp_TxnRef=...)
+        if (vnpTxnRef) {
+            paymentService.syncPaymentStatus(vnpTxnRef)
+                .then((result) => {
+                    setPayment(result);
+                    if (result?.status === "COMPLETED" || vnpResponseCode === "00") {
+                        setStatus("success");
+                        // Fetch danh sách vé vừa cấp từ Backend
+                        if (result?.reservationId) {
+                            ticketService.getMyTickets().then((data) => {
+                                const list = Array.isArray(data) ? data : (data?.content || []);
+                                const mine = list.filter((t) => t.reservationId === result.reservationId);
+                                if (mine.length > 0) setIssuedTickets(mine);
+                            }).catch(() => {});
+                        }
+                    } else if (result?.status === "EXPIRED" || vnpResponseCode === "11" || vnpResponseCode === "24") {
+                        setStatus("expired");
+                    } else {
+                        setStatus("failed");
+                    }
+                })
+                .catch(() => {
+                    setStatus(vnpResponseCode === "00" ? "success" : "failed");
+                });
+            return;
         }
-        return "success"; // Default fallback
+
+        // Fallback mặc định
+        setStatus("success");
+    }, [locationState.status, vnpTxnRef, vnpResponseCode]);
+
+    // Gửi lại email chứa vé
+    const handleResendTicket = async (ticketId) => {
+        if (!ticketId) return;
+        setIsResending(true);
+        setFeedbackMsg("");
+        try {
+            await ticketService.resendTicketEmail(ticketId);
+            setFeedbackMsg("Đã gửi lại vé vào email thành công!");
+        } catch (err) {
+            setFeedbackMsg(err.message || "Gửi lại vé thất bại. Thử lại sau.");
+        } finally {
+            setIsResending(false);
+        }
     };
 
-    const [status, setStatus] = useState(getInitialState);
-
-    // Dữ liệu giao dịch (Ưu tiên lấy từ state hoặc URL params, fallback dữ liệu mẫu)
+    // -----------------------------------------------------------------------
+    // Dữ liệu tổng hợp để hiển thị UI
+    // -----------------------------------------------------------------------
     const transactionData = {
-        orderCode: queryParams.get("vnp_TxnRef") || location.state?.orderCode || "EH20251025001",
-        amount: queryParams.get("vnp_Amount")
-            ? parseInt(queryParams.get("vnp_Amount")) / 100
-            : location.state?.totalAmount || 2250000,
-        paymentMethod: queryParams.get("vnp_BankCode") || location.state?.paymentMethod || "VNPay",
-        paidAt: location.state?.paidAt || new Date().toLocaleString("vi-VN"),
-        eventName: location.state?.eventName || "The Dreams Concert 2025",
-        venue: location.state?.venue || "SVĐ Mỹ Đình, Hà Nội",
-        eventDate: location.state?.eventDate || "25 Tháng 10, 2025 | 15:00 - 22:00",
-        ticketType: location.state?.ticketType || "VIP",
-        quantity: location.state?.quantity || 2,
-        bannerUrl: location.state?.bannerUrl || "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1200",
-        failureReason: location.state?.failureReason || "Giao dịch bị hủy hoặc vượt quá thời gian xác thực OTP."
+        orderCode: payment?.txnRef || locationState.orderCode || locationState.transactionId || vnpTxnRef || "EH20251025001",
+        amount: payment?.amountCents != null
+            ? formatVnd(payment.amountCents)
+            : (locationState.totalAmount ? `${locationState.totalAmount.toLocaleString("vi-VN")}đ` : "0đ"),
+        paymentMethod: payment?.provider || (locationState.paymentMethod || "VNPay").toUpperCase(),
+        paidAt: payment?.completedAt ? new Date(payment.completedAt).toLocaleString("vi-VN") : (locationState.paidAt || new Date().toLocaleString("vi-VN")),
+        eventName: locationState.eventName || locationState.event?.name || "The Dreams Concert 2025",
+        venue: locationState.venue || locationState.event?.venue || "SVĐ Mỹ Đình, Hà Nội",
+        eventDate: locationState.eventDate || "25 Tháng 10, 2025 | 15:00 - 22:00",
+        ticketType: locationState.ticketType || "VIP",
+        quantity: locationState.quantity || (issuedTickets.length > 0 ? issuedTickets.length : 1),
+        bannerUrl: locationState.bannerUrl || locationState.event?.bannerUrl || "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1200",
+        failureReason: payment?.failureReason || locationState.failureReason || "Giao dịch bị hủy hoặc vượt quá thời gian xác thực OTP."
     };
+
+    if (status === "loading") {
+        return (
+            <div className="bg-[#F8FAFC] min-h-screen flex flex-col justify-between">
+                <Header />
+                <div className="flex-1 flex items-center justify-center py-20">
+                    <div className="text-center space-y-3">
+                        <div className="w-10 h-10 border-4 border-[#4353ff] border-t-transparent rounded-full animate-spin mx-auto" />
+                        <p className="text-xs font-bold text-slate-600">Đang kiểm tra & đối soát kết quả giao dịch...</p>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
 
     return (
         <div className="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen flex flex-col justify-between font-sans">
@@ -56,9 +133,9 @@ export default function PaymentResult() {
                             <span className="text-slate-800 font-semibold">Kết quả thanh toán</span>
                         </nav>
 
-                        {/* Interactive Toolbar Test Switcher */}
+                        {/* Switcher Mô phỏng UI */}
                         <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center space-x-1 self-start md:self-auto overflow-x-auto max-w-full">
-                            <span className="text-[11px] text-slate-400 font-bold px-2 hidden lg:inline-block uppercase tracking-wider">Mô phỏng:</span>
+                            <span className="text-[11px] text-slate-400 font-bold px-2 hidden lg:inline-block uppercase tracking-wider">Mô phỏng UI:</span>
 
                             <button
                                 onClick={() => setStatus("success")}
@@ -101,16 +178,23 @@ export default function PaymentResult() {
                         </div>
                     </div>
 
+                    {/* Feedback Alert Notice */}
+                    {feedbackMsg && (
+                        <div className="mb-6 p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-[#4353ff] text-xs font-semibold flex items-center justify-between">
+                            <span>{feedbackMsg}</span>
+                            <button onClick={() => setFeedbackMsg("")} className="text-indigo-400 hover:text-indigo-800">✕</button>
+                        </div>
+                    )}
+
                     {/* MAIN TWO-COLUMN LAYOUT */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                        {/* LEFT COLUMN: DYNAMIC STATE CONTENT (SPAN 8) */}
+                        {/* LEFT COLUMN: DYNAMIC STATE CONTENT */}
                         <div className="lg:col-span-8 flex flex-col space-y-6">
 
                             {/* ================= 1. TRƯỜNG HỢP: THÀNH CÔNG ================= */}
                             {status === "success" && (
                                 <div className="space-y-6 animate-fadeIn">
-                                    {/* Hero Banner Success */}
                                     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50/70 to-purple-50 border border-indigo-100/60 p-6 sm:p-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 shadow-xs">
                                         <div className="relative shrink-0">
                                             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
@@ -137,7 +221,7 @@ export default function PaymentResult() {
                                                     </div>
                                                     <div>
                                                         <p className="text-[11px] text-slate-400 font-semibold uppercase">Số tiền đã thanh toán</p>
-                                                        <p className="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight">{transactionData.amount.toLocaleString("vi-VN")}đ</p>
+                                                        <p className="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight">{transactionData.amount}</p>
                                                     </div>
                                                 </div>
                                                 <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-full border border-emerald-100 hidden sm:inline-block">Đã xác nhận</span>
@@ -170,11 +254,22 @@ export default function PaymentResult() {
                                             {/* Alert Email Notice */}
                                             <div className="p-4 bg-blue-50/70 rounded-2xl border border-blue-100 flex items-start space-x-3 text-xs text-blue-800">
                                                 <div className="w-5 h-5 rounded-full bg-[#4353ff] text-white flex items-center justify-center shrink-0 font-bold text-xs mt-0.5">i</div>
-                                                <span>Vé điện tử đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư (bao gồm cả thư mục Spam/Quảng cáo).</span>
+                                                <div className="flex-1">
+                                                    <span>Vé điện tử đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.</span>
+                                                    {issuedTickets.length > 0 && (
+                                                        <button
+                                                            onClick={() => handleResendTicket(issuedTickets[0].ticketId || issuedTickets[0].id)}
+                                                            disabled={isResending}
+                                                            className="ml-2 font-bold underline hover:text-indigo-900 disabled:opacity-50"
+                                                        >
+                                                            {isResending ? "Đang gửi..." : "Gửi lại email"}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                                                <Link to="/profile" className="flex-1 inline-flex justify-center items-center px-4 py-3 bg-[#4353ff] hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl shadow-md shadow-indigo-500/20 transition">
+                                                <Link to="/my-tickets" className="flex-1 inline-flex justify-center items-center px-4 py-3 bg-[#4353ff] hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl shadow-md shadow-indigo-500/20 transition">
                                                     Quản lý vé của tôi
                                                 </Link>
                                                 <Link to="/home" className="flex-1 inline-flex justify-center items-center px-4 py-3 border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-2xl transition bg-white">
@@ -214,17 +309,17 @@ export default function PaymentResult() {
                                                                 <rect height="18" width="18" x="72" y="72"></rect>
                                                             </svg>
                                                         </div>
-                                                        <span className="text-[10px] text-slate-400 mt-2 font-mono">Mã vé: <strong class="text-slate-800">#{transactionData.orderCode}</strong></span>
+                                                        <span className="text-[10px] text-slate-400 mt-2 font-mono">Mã vé: <strong className="text-slate-800">#{transactionData.orderCode}</strong></span>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <button className="mt-4 w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-[#4353ff] font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 transition" type="button">
+                                            <Link to="/my-tickets" className="mt-4 w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-[#4353ff] font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 transition">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                                     <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeLinecap="round" strokeLinejoin="round"></path>
                                                 </svg>
-                                                <span>Tải vé xuống (PDF)</span>
-                                            </button>
+                                                <span>Quản lý vé của tôi</span>
+                                            </Link>
                                         </div>
                                     </div>
                                 </div>
@@ -263,7 +358,7 @@ export default function PaymentResult() {
                                             </div>
                                             <div className="py-2.5 flex justify-between items-center">
                                                 <span className="text-slate-500">Lý do thất bại</span>
-                                                <span className="font-semibold text-rose-600">{transactionData.failureReason}</span>
+                                                <span className="font-semibold text-rose-600 text-right max-w-[60%]">{transactionData.failureReason}</span>
                                             </div>
                                             <div className="py-2.5 flex justify-between items-center">
                                                 <span className="text-slate-500">Phương thức thử</span>
@@ -308,7 +403,7 @@ export default function PaymentResult() {
                                         <div className="p-4 bg-sky-50 rounded-2xl border border-sky-100 flex items-center justify-between text-xs text-sky-800">
                                             <div className="flex items-center space-x-2">
                                                 <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">i</div>
-                                                <span className="font-medium">Số tiền sẽ được hoàn trả (nếu đã chuyển): <strong className="text-sky-950 font-bold">{transactionData.amount.toLocaleString("vi-VN")}đ</strong></span>
+                                                <span className="font-medium">Số tiền sẽ được hoàn trả (nếu đã chuyển): <strong className="text-sky-950 font-bold">{transactionData.amount}</strong></span>
                                             </div>
                                             <span className="bg-white px-2.5 py-1 rounded-xl text-sky-700 font-bold border border-sky-200">Tự động hoàn tiền</span>
                                         </div>
