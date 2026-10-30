@@ -46,14 +46,14 @@ export default function Login() {
             <main className="relative z-10 w-full max-w-[1480px] mx-auto px-6 py-8 lg:py-12 flex-1 flex flex-col justify-between">
                 {/* Top Navigation Bar / Logo */}
                 <header className="w-full mb-6 lg:mb-8">
-                    <div className="flex items-center gap-3">
+                    <Link to="/" className="inline-flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-700 via-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
                             <svg className="w-6 h-6 transform -rotate-12" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M19.5 7.05h-15a2.25 2.25 0 00-2.25 2.25v1.2a1.5 1.5 0 010 3v1.2a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25v-1.2a1.5 1.5 0 010-3v-1.2a2.25 2.25 0 00-2.25-2.25zm-6 8.2h-3v-1.5h3v1.5zm0-3.2h-3v-1.5h3v1.5zm0-3.2h-3v-1.5h3v1.5z"></path>
                             </svg>
                         </div>
                         <span className="text-2xl font-bold tracking-tight text-slate-900">EventPass</span>
-                    </div>
+                    </Link>
                 </header>
 
                 {/* Main Grid Container */}
@@ -62,9 +62,9 @@ export default function Login() {
                     {/* Left Column (Brand & Showcase Section) */}
                     <section className="lg:col-span-7 flex flex-col justify-center pr-0 xl:pr-6">
                         <div className="inline-flex items-center gap-2 mb-3">
-              <span className="text-xs sm:text-sm font-extrabold tracking-wider text-indigo-600 uppercase">
-                KẾT NỐI ĐAM MÊ <span className="text-[10px] align-middle">•</span> TRẢI NGHIỆM TUYỆT VỜI
-              </span>
+                            <span className="text-xs sm:text-sm font-extrabold tracking-wider text-indigo-600 uppercase">
+                                KẾT NỐI ĐAM MÊ <span className="text-[10px] align-middle">•</span> TRẢI NGHIỆM TUYỆT VỜI
+                            </span>
                         </div>
 
                         <h1 className="text-3xl sm:text-5xl xl:text-[54px] font-extrabold text-slate-950 tracking-tight leading-[1.18] mb-4">
@@ -112,7 +112,7 @@ export default function Login() {
                             </div>
                         </div>
 
-                        {/* Artistic Concert Image with Splash Mask & Doodles */}
+                        {/* Artistic Concert Image Container */}
                         <div className="relative w-full max-w-lg mx-auto lg:mx-0 pt-2 pb-6">
                             <div className="absolute -top-3 right-24 sm:right-32 text-indigo-500 w-8 h-8 pointer-events-none transform rotate-12">
                                 <svg fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24">
@@ -142,7 +142,6 @@ export default function Login() {
                                 </svg>
                             </div>
 
-                            {/* Splash Masked Concert Image Container */}
                             <div
                                 className="relative mx-auto w-[90%] sm:w-[460px] h-[230px] sm:h-[260px] overflow-hidden shadow-2xl bg-indigo-950"
                                 style={{
@@ -241,9 +240,13 @@ export default function Login() {
                                         <input defaultChecked className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500/30" type="checkbox" />
                                         <span className="text-xs sm:text-[13px] font-medium text-slate-700">Lưu đăng nhập</span>
                                     </label>
-                                    <a className="text-xs sm:text-[13px] font-medium text-indigo-600 hover:text-indigo-700 transition-colors" href="#">
+                                    {/* Cập nhật liên kết Quên mật khẩu sang dùng Link của react-router-dom */}
+                                    <Link
+                                        to="/forgot-password"
+                                        className="text-xs sm:text-[13px] font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                                    >
                                         Quên mật khẩu?
-                                    </a>
+                                    </Link>
                                 </div>
 
                                 <button
@@ -263,8 +266,8 @@ export default function Login() {
                                     <div className="w-full border-t border-slate-100"></div>
                                 </div>
                                 <span className="relative px-3 bg-white text-[11px] font-medium text-slate-400">
-                  Hoặc đăng nhập với
-                </span>
+                                    Hoặc đăng nhập với
+                                </span>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">

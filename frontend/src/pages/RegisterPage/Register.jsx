@@ -41,7 +41,7 @@ export default function Register() {
             }
 
             // Chuyển hướng về trang chủ sau khi đăng nhập tự động thành công
-            navigate('/');
+            navigate('/home');
         } catch (err) {
             console.error('Lỗi đăng ký:', err);
             setError(err.message || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.');

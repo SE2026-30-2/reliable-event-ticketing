@@ -2,6 +2,9 @@ import { Link, Navigate, Routes, Route } from "react-router-dom";
 import LandingPage from "../pages/LandingPage";
 import Login from "../pages/LoginPage/Login";
 import Register from "../pages/RegisterPage/Register";
+import ForgotPassword from "../pages/ForgotPasswordPage/ForgotPassword";
+import ResetPassword from "../pages/ForgotPasswordPage/ResetPassword.jsx";
+import VerifyEmail from "../pages/ForgotPasswordPage/VerifyEmail.jsx";
 import Home from "../pages/HomePage/Home";
 import PrivateRoute from "./PrivateRoute";
 import Profile from "../pages/ProfilePage/Profile";
@@ -28,6 +31,9 @@ export default function AppRoutes() {
       {/* Route chính / */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/register" element={<Register />} />
       <Route path="/events/:eventId" element={<EventDetail />} />
       <Route path="/event/:eventId" element={<EventDetail />} />
