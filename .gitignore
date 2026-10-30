@@ -1,3 +1,9 @@
+# Keep repository rules and backend source uploadable, including when local
+# .git/info/exclude contains a broad backend/ rule. Do not unignore backend/**:
+# generated files and credentials below must remain excluded.
+!/.gitignore
+!/backend/
+
 # Maven
 target/
 pom.xml.tag
@@ -8,8 +14,6 @@ release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-.mvn/wrapper/maven-wrapper.properties
 
 # Gradle
 .gradle/
@@ -40,13 +44,14 @@ bin/
 /.nb-gradle/
 
 # VS Code
-.vscode/
+.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
 # Package Files
+*.class
 *.jar
 *.war
 *.nar
@@ -55,19 +60,27 @@ bin/
 *.tar.gz
 *.rar
 
+# Wrapper binaries/configuration are required for reproducible builds.
+!**/.mvn/wrapper/maven-wrapper.jar
+!**/.mvn/wrapper/maven-wrapper.properties
+!**/gradle/wrapper/gradle-wrapper.jar
+
 # virtual machine crash logs
 hs_err_pid*
 replay_pid*
+*.hprof
 
 # Log files
 *.log
+logs/
 
-# Environment files
+# Environment files (keep sanitized templates)
 .env
-.env.local
-.env.development
-.env.test
-.env.production
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.template
 
 # Application properties overrides
 application-*.properties
@@ -78,7 +91,6 @@ application-*.properties
 *.0
 *.1
 *.2
-*.lock
 mongod.lock
 /data/db/
 
@@ -111,7 +123,7 @@ k8s/*.yaml
 
 # Docker
 .docker/
-*.dockerignore
+!**/.dockerignore
 !docker-compose*.yml
 
 # Maven wrapper
@@ -147,6 +159,7 @@ k8s/*.yaml
 
 # Application specific
 tmp/
+temp/
 
 # Docker volume data
 volume-data/
@@ -156,9 +169,63 @@ backend/ticketing-platform/postgres-data/
 
 # Locally generated QR/JWT signing keys
 **/keys/
+*.pem
+*.key
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+.aws/
 
 # Keep empty directories
 !.gitkeep
 
 # Node modules
 node_modules/
+
+# Bundles, dependency caches and generated Expo files
+dist/
+dist-ssr/
+web-build/
+.expo/
+expo-env.d.ts
+.cache/
+.npm/
+.vite/
+.parcel-cache/
+*.tsbuildinfo
+.metro-health-check*
+.kotlin/
+
+# Test output (keep test source and runner configuration)
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Local Python helpers and editor/assistant state
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.claude/
+.codex/
+*.swp
+*.swo
+*.bak
+*.orig
+
+# Archived frontend; the maintained application is frontend/.
+/frontend_old/
+
+# Keep dependency lockfiles even if a local exclude contains *.lock.
+!package-lock.json
+!yarn.lock
+!pnpm-lock.yaml
+!bun.lock
+!bun.lockb
+!gradle.lockfile
