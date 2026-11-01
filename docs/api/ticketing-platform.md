@@ -2,7 +2,7 @@
 
 Base URL `http://localhost:8091`. Swagger UI: `/swagger-ui.html`, OpenAPI: `/api-docs`. Định dạng JSON, thời gian ISO-8601 UTC.
 
-**Xác thực**: 🔓 công khai · 👤 `Authorization: Bearer <JWT>` của **bất kỳ tài khoản** `user-service` (người mua) · 🔑 JWT có `ROLE_ADMIN` **hoặc** `ROLE_ORGANIZER` (ký hiệu 🔑 trong tài liệu này; ORGANIZER chỉ với **sự kiện của mình**, sự kiện khác trả `404`) · 🛡 chỉ `ROLE_ADMIN` (dùng ở hoàn tiền) · 📟 header `X-Device-Key`. Với 👤, JWT chỉ cho biết *ai* gọi; việc *có sở hữu* đặt chỗ/vé đó hay không do server kiểm tra, và "không phải của bạn" luôn trả `404` (không phải `403`) để không dò được id.
+**Xác thực**: 🔓 công khai · 👤 `Authorization: Bearer <JWT>` của **bất kỳ tài khoản** `identity-service` (người mua) · 🔑 JWT có `ROLE_ADMIN` **hoặc** `ROLE_ORGANIZER` (ký hiệu 🔑 trong tài liệu này; ORGANIZER chỉ với **sự kiện của mình**, sự kiện khác trả `404`) · 🛡 chỉ `ROLE_ADMIN` (dùng ở hoàn tiền) · 📟 header `X-Device-Key`. Với 👤, JWT chỉ cho biết *ai* gọi; việc *có sở hữu* đặt chỗ/vé đó hay không do server kiểm tra, và "không phải của bạn" luôn trả `404` (không phải `403`) để không dò được id.
 
 **Lỗi** (mọi endpoint): `{ "timestamp", "status", "error", "message" }`.
 
@@ -224,7 +224,7 @@ Thứ tự ưu tiên kiểm tra: xem [architecture.md](../architecture.md#check-
 
 ### `GET /.well-known/jwks.json` 🔓
 
-JWK Set chứa public key RS256 dùng ký QR (`kid = ticket-service-key-1`). Check-in app tải và cache để tự xác minh chữ ký **offline** trên thiết bị (server luôn xác minh lại khi nhận). Dạng JWK Set chuẩn, `kid` khớp tiền tố của QR; app tải lại khi gặp `kid` lạ. Đây là khóa của `catalog`, độc lập với JWKS của `user-service`.
+JWK Set chứa public key RS256 dùng ký QR (`kid = ticket-service-key-1`). Check-in app tải và cache để tự xác minh chữ ký **offline** trên thiết bị (server luôn xác minh lại khi nhận). Dạng JWK Set chuẩn, `kid` khớp tiền tố của QR; app tải lại khi gặp `kid` lạ. Đây là khóa của `catalog`, độc lập với JWKS của `identity-service`.
 
 ## Kafka (nội bộ)
 

@@ -4,6 +4,10 @@
 
 Both databases now share one PostgreSQL container. Before starting the apps with existing volumes, follow [postgres-migration.md](postgres-migration.md).
 
+## Docker PostgreSQL migration
+
+Both databases now share one PostgreSQL container. Before starting the apps with existing volumes, follow [postgres-migration.md](postgres-migration.md).
+
 ## Yêu cầu
 
 - **JDK 21** (cần `javac`, không chỉ JRE — build lỗi `release version 21 not supported` nghĩa là máy chỉ có JRE; đặt `JAVA_HOME` tới một JDK 21)
@@ -35,51 +39,51 @@ Dừng: `docker compose down` (thêm `-v` sẽ xóa volume DB và khóa ký). Đ
 
 ## Bảng port
 
-| Thành phần | Host port | Ghi chú |
-|---|---|---|
-| Frontend (Vite dev) | 5173 | |
-| `ticketing-platform` | 8091 | container nghe 8080 (`SERVER_PORT`), map `8091:8080`; Swagger `/swagger-ui.html` |
-| `user-service` | 8087 | Swagger `/swagger-ui.html` |
-| Kafka UI | 8086 | chỉ bind loopback |
-| Kafka broker | 9092 (host) / 29092 (trong mạng compose) | loopback |
-| Zookeeper | 2181 | loopback |
-| PostgreSQL `ticketing_platform` | 5436 | loopback, user `ticketing_app` |
-| PostgreSQL `identity_service` | 5436 | loopback, user `identity_app` |
+| Thành phần                      | Host port                                | Ghi chú                                                                          |
+| ------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
+| Frontend (Vite dev)             | 5173                                     |                                                                                  |
+| `ticketing-platform`            | 8091                                     | container nghe 8080 (`SERVER_PORT`), map `8091:8080`; Swagger `/swagger-ui.html` |
+| `identity-service`              | 8087                                     | Swagger `/swagger-ui.html`                                                       |
+| Kafka UI                        | 8086                                     | chỉ bind loopback                                                                |
+| Kafka broker                    | 9092 (host) / 29092 (trong mạng compose) | loopback                                                                         |
+| Zookeeper                       | 2181                                     | loopback                                                                         |
+| PostgreSQL `ticketing_platform` | 5436                                     | loopback, user `ticketing_app`                                                   |
+| PostgreSQL `identity_service`   | 5436                                     | loopback, user `identity_app`                                                    |
 
 ## Biến môi trường
 
 Compose đã đặt sẵn giá trị đúng cho mạng nội bộ; dưới đây là các biến đáng chú ý của `ticketing-platform` (mặc định khi chạy ngoài Docker nằm trong `application.properties`).
 
-| Biến | Mặc định | Ý nghĩa |
-|---|---|---|
-| `SPRING_DATASOURCE_URL/USERNAME` | `jdbc:postgresql://localhost:5436/ticketing_platform` / `ticketing_app` | DB |
-| `SPRING_DATASOURCE_PASSWORD` | **bắt buộc, không có mặc định** | app không khởi động nếu thiếu; compose lấy từ `TICKETING_DB_PASSWORD` / `IDENTITY_DB_PASSWORD` trong `.env` |
-| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | trong compose: `broker:29092` |
-| `SECURITY_JWT_JWK_SET_URI` | `http://localhost:8087/.well-known/jwks.json` | nơi lấy public key của user-service |
-| `TICKETING_QR_PRIVATE_KEY_PATH` | `./keys/ticket_signing_key.pem` | khóa ký QR; compose mount volume `ticketing-platform-keys` |
-| `TICKETING_QR_REQUIRE_EXISTING_KEY` | `false` | `true` = không tự sinh khóa mới khi thiếu file (bật sau lần khởi động đầu, vì đổi khóa vô hiệu mọi QR đã phát) |
-| `TICKETING_RESERVATION_EXPIRY_MINUTES` | `10` | thời gian giữ chỗ chưa thanh toán |
-| `TICKETING_PAYMENT_SUCCESS_RATE` | `0.9` | tỉ lệ thành công của mock gateway khi không `forceOutcome` |
-| `TICKETING_REQUIRE_VERIFIED_EMAIL` | `true` | đặt chỗ/danh sách chờ cần email đã xác minh (claim `email_verified`). `.env.example` đặt `false` để demo không cần SMTP; **để `true` ở môi trường thật** |
-| `TICKETING_TRANSFER_MAX` / `TICKETING_TRANSFER_CUTOFF_MINUTES` | `2` / `60` | số lần một vé được chuyển nhượng (0 = tắt) / đóng chuyển nhượng trước giờ bắt đầu |
-| `TICKETING_WAITLIST_INTERVAL_MS` | `30000` | chu kỳ job cấp quota cho danh sách chờ |
-| `TICKETING_PAYMENT_PROVIDER` | `mock` | `mock` hoặc `vnpay`. Với `vnpay` phải có 3 biến dưới, thiếu thì app **không khởi động** |
-| `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | rỗng | mã website và khóa bí mật của tài khoản merchant VNPay (không commit) |
-| `VNPAY_RETURN_URL` | rỗng | trang frontend người mua được đưa về, vd `http://localhost:5173/payment/result` |
-| `VNPAY_PAY_URL`, `VNPAY_API_URL` | URL sandbox | đổi sang URL production khi chạy thật |
-| `TICKETING_PAYMENT_RECONCILE_MS` | `60000` | chu kỳ job đối soát thanh toán VNPay |
-| `TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME` | `false` | cho phép client ép kết quả thanh toán (chỉ để demo; `.env.example` bật `true`). Khi `false`, gửi `forceOutcome` bị `400` |
-| `TICKETING_RESERVATION_MAX_ACTIVE_PER_EMAIL` | `10` | số vé tối đa một **tài khoản** được giữ `RESERVED` cùng lúc (vượt → `429`) |
-| `TICKETING_RATE_LIMIT_RESERVATIONS` / `_PAYMENTS` / `_RESENDS` / `_WINDOW_SECONDS` | `10` / `20` / `5` / `60` | giới hạn theo IP cho `POST …/reservations`, `POST /api/payment/requests`, `POST /api/ticket/{id}/resend`. Chuyển nhượng (5) và danh sách chờ (10) chỉnh bằng property `ticketing.rate-limit.transfers-per-window` / `waitlist-per-window` |
-| `TICKETING_RATE_LIMIT_TRUST_FORWARDED_FOR` | `false` | `true` **chỉ** khi sau reverse proxy luôn ghi đè `X-Forwarded-For`; ngược lại client tự bịa IP để né giới hạn |
-| `TICKETING_OUTBOX_RETENTION_DAYS` | `7` | giữ dòng outbox đã relay bao lâu trước khi xóa |
-| `MANAGEMENT_ENDPOINTS_EXPOSURE` | `health,info` | endpoint Actuator được mở (cả hai app); thêm `prometheus` chỉ khi cổng được bảo vệ ở tầng mạng |
-| `SPRING_FLYWAY_LOCATIONS` (user-service) | `classpath:db/migration` | `.env.example` thêm `classpath:db/dev-seed` để seed ADMIN demo — **không dùng ở nơi thật** |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | cả hai app |
-| `FRONTEND_BASE_URL` | `http://localhost:5173` | dùng dựng link trong email xác thực/đặt lại mật khẩu |
-| `MAIL_HOST/PORT/USERNAME/PASSWORD` | Mailtrap sandbox, rỗng | tài khoản SMTP; thiếu thì app vẫn chạy nhưng gửi mail lỗi (chỉ log) |
-| `MAIL_FROM` | `no-reply@gatekeep.example` | địa chỉ gửi — **phải là sender/domain đã xác minh với nhà cung cấp SMTP**, nếu không mail bị từ chối |
-| `MAIL_SMTP_AUTH` / `MAIL_STARTTLS` | `true` / `true` | cổng 587 của hầu hết nhà cung cấp cần cả hai |
+| Biến                                                                               | Mặc định                                                                | Ý nghĩa                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SPRING_DATASOURCE_URL/USERNAME`                                                   | `jdbc:postgresql://localhost:5436/ticketing_platform` / `ticketing_app` | DB                                                                                                                                                                                                                                        |
+| `SPRING_DATASOURCE_PASSWORD`                                                       | **bắt buộc, không có mặc định**                                         | app không khởi động nếu thiếu; compose lấy từ `TICKETING_DB_PASSWORD` / `IDENTITY_DB_PASSWORD` trong `.env`                                                                                                                               |
+| `SPRING_KAFKA_BOOTSTRAP_SERVERS`                                                   | `localhost:9092`                                                        | trong compose: `broker:29092`                                                                                                                                                                                                             |
+| `SECURITY_JWT_JWK_SET_URI`                                                         | `http://localhost:8087/.well-known/jwks.json`                           | nơi lấy public key của identity-service                                                                                                                                                                                                   |
+| `TICKETING_QR_PRIVATE_KEY_PATH`                                                    | `./keys/ticket_signing_key.pem`                                         | khóa ký QR; compose mount volume `ticketing-platform-keys`                                                                                                                                                                                |
+| `TICKETING_QR_REQUIRE_EXISTING_KEY`                                                | `false`                                                                 | `true` = không tự sinh khóa mới khi thiếu file (bật sau lần khởi động đầu, vì đổi khóa vô hiệu mọi QR đã phát)                                                                                                                            |
+| `TICKETING_RESERVATION_EXPIRY_MINUTES`                                             | `10`                                                                    | thời gian giữ chỗ chưa thanh toán                                                                                                                                                                                                         |
+| `TICKETING_PAYMENT_SUCCESS_RATE`                                                   | `0.9`                                                                   | tỉ lệ thành công của mock gateway khi không `forceOutcome`                                                                                                                                                                                |
+| `TICKETING_REQUIRE_VERIFIED_EMAIL`                                                 | `true`                                                                  | đặt chỗ/danh sách chờ cần email đã xác minh (claim `email_verified`). `.env.example` đặt `false` để demo không cần SMTP; **để `true` ở môi trường thật**                                                                                  |
+| `TICKETING_TRANSFER_MAX` / `TICKETING_TRANSFER_CUTOFF_MINUTES`                     | `2` / `60`                                                              | số lần một vé được chuyển nhượng (0 = tắt) / đóng chuyển nhượng trước giờ bắt đầu                                                                                                                                                         |
+| `TICKETING_WAITLIST_INTERVAL_MS`                                                   | `30000`                                                                 | chu kỳ job cấp quota cho danh sách chờ                                                                                                                                                                                                    |
+| `TICKETING_PAYMENT_PROVIDER`                                                       | `mock`                                                                  | `mock` hoặc `vnpay`. Với `vnpay` phải có 3 biến dưới, thiếu thì app **không khởi động**                                                                                                                                                   |
+| `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`                                              | rỗng                                                                    | mã website và khóa bí mật của tài khoản merchant VNPay (không commit)                                                                                                                                                                     |
+| `VNPAY_RETURN_URL`                                                                 | rỗng                                                                    | trang frontend người mua được đưa về, vd `http://localhost:5173/payment/result`                                                                                                                                                           |
+| `VNPAY_PAY_URL`, `VNPAY_API_URL`                                                   | URL sandbox                                                             | đổi sang URL production khi chạy thật                                                                                                                                                                                                     |
+| `TICKETING_PAYMENT_RECONCILE_MS`                                                   | `60000`                                                                 | chu kỳ job đối soát thanh toán VNPay                                                                                                                                                                                                      |
+| `TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME`                                            | `false`                                                                 | cho phép client ép kết quả thanh toán (chỉ để demo; `.env.example` bật `true`). Khi `false`, gửi `forceOutcome` bị `400`                                                                                                                  |
+| `TICKETING_RESERVATION_MAX_ACTIVE_PER_EMAIL`                                       | `10`                                                                    | số vé tối đa một **tài khoản** được giữ `RESERVED` cùng lúc (vượt → `429`)                                                                                                                                                                |
+| `TICKETING_RATE_LIMIT_RESERVATIONS` / `_PAYMENTS` / `_RESENDS` / `_WINDOW_SECONDS` | `10` / `20` / `5` / `60`                                                | giới hạn theo IP cho `POST …/reservations`, `POST /api/payment/requests`, `POST /api/ticket/{id}/resend`. Chuyển nhượng (5) và danh sách chờ (10) chỉnh bằng property `ticketing.rate-limit.transfers-per-window` / `waitlist-per-window` |
+| `TICKETING_RATE_LIMIT_TRUST_FORWARDED_FOR`                                         | `false`                                                                 | `true` **chỉ** khi sau reverse proxy luôn ghi đè `X-Forwarded-For`; ngược lại client tự bịa IP để né giới hạn                                                                                                                             |
+| `TICKETING_OUTBOX_RETENTION_DAYS`                                                  | `7`                                                                     | giữ dòng outbox đã relay bao lâu trước khi xóa                                                                                                                                                                                            |
+| `MANAGEMENT_ENDPOINTS_EXPOSURE`                                                    | `health,info`                                                           | endpoint Actuator được mở (cả hai app); thêm `prometheus` chỉ khi cổng được bảo vệ ở tầng mạng                                                                                                                                            |
+| `SPRING_FLYWAY_LOCATIONS` (identity-service)                                       | `classpath:db/migration`                                                | `.env.example` thêm `classpath:db/dev-seed` để seed ADMIN demo — **không dùng ở nơi thật**                                                                                                                                                |
+| `CORS_ALLOWED_ORIGINS`                                                             | `http://localhost:5173`                                                 | cả hai app                                                                                                                                                                                                                                |
+| `FRONTEND_BASE_URL`                                                                | `http://localhost:5173`                                                 | dùng dựng link trong email xác thực/đặt lại mật khẩu                                                                                                                                                                                      |
+| `MAIL_HOST/PORT/USERNAME/PASSWORD`                                                 | Mailtrap sandbox, rỗng                                                  | tài khoản SMTP; thiếu thì app vẫn chạy nhưng gửi mail lỗi (chỉ log)                                                                                                                                                                       |
+| `MAIL_FROM`                                                                        | `no-reply@gatekeep.example`                                             | địa chỉ gửi — **phải là sender/domain đã xác minh với nhà cung cấp SMTP**, nếu không mail bị từ chối                                                                                                                                      |
+| `MAIL_SMTP_AUTH` / `MAIL_STARTTLS`                                                 | `true` / `true`                                                         | cổng 587 của hầu hết nhà cung cấp cần cả hai                                                                                                                                                                                              |
 
 Frontend (`frontend/.env`): `VITE_USER_SERVICE_URL` (mặc định `http://localhost:8087`), `VITE_TICKETING_SERVICE_URL` (mặc định `http://localhost:8091`).
 
@@ -99,7 +103,10 @@ Giữ hạ tầng trong compose, chạy app bằng Maven. Mật khẩu DB không
 
 ```bash
 docker compose up -d postgres zookeeper broker
+docker compose up -d postgres zookeeper broker
 set -a; source .env; set +a
+(cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
+(cd backend && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 (cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
 (cd backend && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 ```
@@ -108,11 +115,11 @@ Lần đầu `ticketing-platform` tự sinh khóa ký tại `./keys/ticket_signi
 
 ## Tài khoản mặc định
 
-Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `user-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
+Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `identity-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
 
 ### Cấp quyền nhà tổ chức (ORGANIZER)
 
-ADMIN vào trang **Users** của frontend bấm *Make organizer*, hoặc gọi API (người đó đăng nhập lại để token mang role mới):
+ADMIN vào trang **Users** của frontend bấm _Make organizer_, hoặc gọi API (người đó đăng nhập lại để token mang role mới):
 
 ```bash
 curl -X PATCH localhost:8087/api/user/admin/users/<userId>/roles -H "$A" -H 'Content-Type: application/json' \
@@ -126,7 +133,7 @@ Tài khoản ORGANIZER chỉ thấy và quản lý sự kiện **do chính mình
 1. Đăng ký tài khoản bình thường qua `POST /api/user/register` (role mặc định `USER`).
 2. Nâng quyền trực tiếp trong DB một lần:
    ```sql
-   -- trong database user_service
+   -- trong database identity_service
    INSERT INTO user_roles (user_id, role)
    SELECT id, 'ADMIN' FROM users WHERE email = 'ban@congty.vn';
    ```
@@ -134,7 +141,7 @@ Tài khoản ORGANIZER chỉ thấy và quản lý sự kiện **do chính mình
 
 ## Cấu hình email (SMTP)
 
-Email dùng cho: xác minh tài khoản và đặt lại mật khẩu (user-service), vé kèm QR, thông báo vé bị hủy/hoàn/chuyển nhượng, và lời mời từ danh sách chờ (ticketing-platform). Điền vào `.env` rồi chạy `docker compose up -d user-service ticketing-platform`:
+Email dùng cho: xác minh tài khoản và đặt lại mật khẩu (identity-service), vé kèm QR, thông báo vé bị hủy/hoàn/chuyển nhượng, và lời mời từ danh sách chờ (ticketing-platform). Điền vào `.env` rồi chạy `docker compose up -d identity-service ticketing-platform`:
 
 ```text
 MAIL_HOST=smtp.example.com
@@ -194,20 +201,20 @@ curl -s localhost:8091/api/checkin/events/$EVENT/stats -H "$A"
 
 ### Tác vụ nền
 
-| Tác vụ | Chu kỳ | Việc làm |
-|---|---|---|
-| `OutboxRelayPublisher` | 2 giây | gửi `outbox_events` chưa relay lên Kafka |
-| `ExpireReservationsJob` | 60 giây | hủy reservation quá hạn **không có thanh toán đang chờ**, trả quota và lượt coupon |
-| `WaitlistPromotionJob` | 30 giây (`TICKETING_WAITLIST_INTERVAL_MS`) | cấp quota trống cho danh sách chờ, đóng các lời mời đã trả/hết hạn |
+| Tác vụ                     | Chu kỳ                                                      | Việc làm                                                                                        |
+| -------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `OutboxRelayPublisher`     | 2 giây                                                      | gửi `outbox_events` chưa relay lên Kafka                                                        |
+| `ExpireReservationsJob`    | 60 giây                                                     | hủy reservation quá hạn **không có thanh toán đang chờ**, trả quota và lượt coupon              |
+| `WaitlistPromotionJob`     | 30 giây (`TICKETING_WAITLIST_INTERVAL_MS`)                  | cấp quota trống cho danh sách chờ, đóng các lời mời đã trả/hết hạn                              |
 | `PaymentReconciliationJob` | 60 giây (`TICKETING_PAYMENT_RECONCILE_MS`), chỉ khi `vnpay` | hỏi VNPay cho payment `PENDING` quá 90 giây hoặc quá hạn; hoàn tiền các khoản `REFUND_REQUIRED` |
-| `OutboxCleanupJob` | 1 giờ | xóa dòng outbox đã relay quá `TICKETING_OUTBOX_RETENTION_DAYS` ngày |
+| `OutboxCleanupJob`         | 1 giờ                                                       | xóa dòng outbox đã relay quá `TICKETING_OUTBOX_RETENTION_DAYS` ngày                             |
 
 ### Khóa ký QR (quan trọng nhất)
 
 - Mất hoặc sinh lại khóa ⇒ **mọi QR đã phát thành `INVALID_SIGNATURE`**, không có cách phát lại ngầm. Khóa nằm ở volume `ticketing-platform-keys` (`/app/keys/ticket_signing_key.pem`).
 - Sau lần khởi động đầu (đã có file khóa), đặt `TICKETING_QR_REQUIRE_EXISTING_KEY=true` để app **từ chối khởi động** thay vì âm thầm sinh khóa mới khi mất file.
 - Backup khóa (có thể dùng container tạm): `docker run --rm -v cms_ticketing-platform-keys:/k -v "$PWD":/b alpine cp /k/ticket_signing_key.pem /b/`. Giữ bản backup như một secret; `**/keys/` đã được `.gitignore`.
-- Chưa có rotation (một `kid` cố định). Tương tự với khóa JWT của `user-service` (volume `user-service-keys`), nhưng JWT chỉ sống 15 phút nên hậu quả nhẹ hơn nhiều.
+- Chưa có rotation (một `kid` cố định). Tương tự với khóa JWT của `identity-service` (volume `identity-service-keys`), nhưng JWT chỉ sống 15 phút nên hậu quả nhẹ hơn nhiều.
 
 ### Kafka: retry, DLT và quan sát
 
@@ -240,32 +247,28 @@ npm run build                                   # tsc + vite build
 
 Test `*IT` cố ý không nằm trong luồng mặc định/CI (cần Docker đáng tin cậy); chạy theo yêu cầu bằng `-Dtest=`.
 
-## CI
-
-`.github/workflows/backend-ci.yml`: matrix `[user-service, ticketing-platform]` chạy `./mvnw -B clean verify`, sau đó job `docker-compose-smoke-test` dựng cả stack và đợi mọi container `healthy`.
-
 ## Troubleshooting
 
-| Triệu chứng | Nguyên nhân / cách xử lý |
-|---|---|
-| `release version 21 not supported` khi build | chỉ có JRE; cài/đặt `JAVA_HOME` tới JDK 21 |
-| `docker compose up --build` báo không thấy jar | chưa chạy `./mvnw package` cho app đó |
-| `ticketing-platform` mãi không healthy | cần `user-service`, Postgres và broker healthy trước; xem `docker compose logs ticketing-platform` |
-| Vé kẹt ở `RESERVED` sau khi thanh toán | listener Kafka chưa nhận: kiểm tra broker, topic `payment-completed` trong Kafka UI (:8086) và DLT `*.DLT` |
-| `docker compose up` báo thiếu `TICKETING_DB_PASSWORD`/`IDENTITY_DB_PASSWORD` | chưa có `.env`: `cp .env.example .env` |
-| user-service: `Found more than one migration with version 2` | file migration cũ còn trong `target/`; build với `./mvnw clean package` |
-| `POST /reservations` hoặc `/payment/requests` trả 401 | thiếu/hết hạn JWT (15 phút): đăng nhập lại — mua vé giờ cần tài khoản |
-| `GET /api/ticket/{id}` trả 404 dù vé có thật | vé thuộc tài khoản khác (cố ý trả 404 thay vì 403); ADMIN đọc được mọi vé |
-| `POST /reservations` hoặc `/payment/requests` trả 429 | vượt giới hạn IP (xem `Retry-After`) hoặc email đang giữ quá nhiều vé `RESERVED` |
-| `forceOutcome is a demo/test hook…` (400) | `TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=false` (đúng cho môi trường thật) |
-| Tạo event trả 401 | JWT hết hạn (15 phút) hoặc thiếu role `ADMIN` |
-| Tất cả QR cũ báo `INVALID_SIGNATURE` sau khi chạy lại | khóa ký bị sinh lại (mất volume/file khóa); bật `TICKETING_QR_REQUIRE_EXISTING_KEY=true` sau lần đầu |
-| Trình duyệt chặn gọi API (CORS) | origin frontend khác `http://localhost:5173` → đặt `CORS_ALLOWED_ORIGINS` cho cả hai app |
-| Quét camera không có nút | trình duyệt không hỗ trợ `BarcodeDetector`; dùng ô dán payload hoặc máy quét phần cứng |
-| Đặt chỗ trả `403` "Please verify your email…" | email chưa xác minh; xác minh qua link trong email rồi **làm mới phiên** (frontend tự làm), hoặc `TICKETING_REQUIRE_VERIFIED_EMAIL=false` khi demo |
-| Organizer thấy "not allowed" ở trang Manage | role mới chỉ có trong token mới: đăng xuất/đăng nhập lại; hoặc chưa được ADMIN cấp `ORGANIZER` |
-| Organizer nhận `404` với sự kiện có thật | sự kiện thuộc tài khoản khác (cố ý trả 404 thay vì 403) |
-| Đặt chỗ trả `409` dù còn vé | đang có người trong danh sách chờ vừa với số vé trống — quota thuộc về hàng đợi; hoặc sự kiện chưa `PUBLISHED`/đã kết thúc |
-| Chuyển nhượng trả `409` | vé không `ISSUED`, đã đạt `TICKETING_TRANSFER_MAX`, quá sát giờ bắt đầu, hoặc đã quét vào |
-| Thanh toán VNPay mãi `PENDING` | IPN không tới được (localhost) — trang `/payment/result` và job đối soát sẽ hỏi lại VNPay; kiểm tra `VNPAY_*`, `docker compose logs ticketing-platform | grep -i vnpay` |
-| Không nhận email | chưa cấu hình `MAIL_*` / `MAIL_FROM` chưa được nhà cung cấp xác minh; xem log |
+| Triệu chứng                                                                  | Nguyên nhân / cách xử lý                                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| `release version 21 not supported` khi build                                 | chỉ có JRE; cài/đặt `JAVA_HOME` tới JDK 21                                                                                                             |
+| `docker compose up --build` báo không thấy jar                               | chưa chạy `./mvnw package` cho app đó                                                                                                                  |
+| `ticketing-platform` mãi không healthy                                       | cần `identity-service`, Postgres và broker healthy trước; xem `docker compose logs ticketing-platform`                                                 |
+| Vé kẹt ở `RESERVED` sau khi thanh toán                                       | listener Kafka chưa nhận: kiểm tra broker, topic `payment-completed` trong Kafka UI (:8086) và DLT `*.DLT`                                             |
+| `docker compose up` báo thiếu `TICKETING_DB_PASSWORD`/`IDENTITY_DB_PASSWORD` | chưa có `.env`: `cp .env.example .env`                                                                                                                 |
+| identity-service: `Found more than one migration with version 2`             | file migration cũ còn trong `target/`; build với `./mvnw clean package`                                                                                |
+| `POST /reservations` hoặc `/payment/requests` trả 401                        | thiếu/hết hạn JWT (15 phút): đăng nhập lại — mua vé giờ cần tài khoản                                                                                  |
+| `GET /api/ticket/{id}` trả 404 dù vé có thật                                 | vé thuộc tài khoản khác (cố ý trả 404 thay vì 403); ADMIN đọc được mọi vé                                                                              |
+| `POST /reservations` hoặc `/payment/requests` trả 429                        | vượt giới hạn IP (xem `Retry-After`) hoặc email đang giữ quá nhiều vé `RESERVED`                                                                       |
+| `forceOutcome is a demo/test hook…` (400)                                    | `TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=false` (đúng cho môi trường thật)                                                                               |
+| Tạo event trả 401                                                            | JWT hết hạn (15 phút) hoặc thiếu role `ADMIN`                                                                                                          |
+| Tất cả QR cũ báo `INVALID_SIGNATURE` sau khi chạy lại                        | khóa ký bị sinh lại (mất volume/file khóa); bật `TICKETING_QR_REQUIRE_EXISTING_KEY=true` sau lần đầu                                                   |
+| Trình duyệt chặn gọi API (CORS)                                              | origin frontend khác `http://localhost:5173` → đặt `CORS_ALLOWED_ORIGINS` cho cả hai app                                                               |
+| Quét camera không có nút                                                     | trình duyệt không hỗ trợ `BarcodeDetector`; dùng ô dán payload hoặc máy quét phần cứng                                                                 |
+| Đặt chỗ trả `403` "Please verify your email…"                                | email chưa xác minh; xác minh qua link trong email rồi **làm mới phiên** (frontend tự làm), hoặc `TICKETING_REQUIRE_VERIFIED_EMAIL=false` khi demo     |
+| Organizer thấy "not allowed" ở trang Manage                                  | role mới chỉ có trong token mới: đăng xuất/đăng nhập lại; hoặc chưa được ADMIN cấp `ORGANIZER`                                                         |
+| Organizer nhận `404` với sự kiện có thật                                     | sự kiện thuộc tài khoản khác (cố ý trả 404 thay vì 403)                                                                                                |
+| Đặt chỗ trả `409` dù còn vé                                                  | đang có người trong danh sách chờ vừa với số vé trống — quota thuộc về hàng đợi; hoặc sự kiện chưa `PUBLISHED`/đã kết thúc                             |
+| Chuyển nhượng trả `409`                                                      | vé không `ISSUED`, đã đạt `TICKETING_TRANSFER_MAX`, quá sát giờ bắt đầu, hoặc đã quét vào                                                              |
+| Thanh toán VNPay mãi `PENDING`                                               | IPN không tới được (localhost) — trang `/payment/result` và job đối soát sẽ hỏi lại VNPay; kiểm tra `VNPAY_*`, `docker compose logs ticketing-platform | grep -i vnpay` |
+| Không nhận email                                                             | chưa cấu hình `MAIL_*` / `MAIL_FROM` chưa được nhà cung cấp xác minh; xem log                                                                          |

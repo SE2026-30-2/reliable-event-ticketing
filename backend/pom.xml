@@ -33,11 +33,11 @@
 		<testcontainers.version>1.21.4</testcontainers.version>
 	</properties>
 	<dependencies>
-		<!-- Two independent uses: (1) verifies user-service's JWT (NimbusJwtDecoder.withJwkSetUri) to
+		<!-- Two independent uses: (1) verifies identity-service's JWT (NimbusJwtDecoder.withJwkSetUri) to
 		     gate ROLE_ADMIN endpoints, same as order-service's SecurityConfig; (2) supplies the
 		     nimbus-jose-jwt JWK/JWKS types this service's own JwksController uses to publish its
 		     QR-signing public key - no separate OAuth2 Authorization Server dependency needed, same
-		     reasoning as user-service's pom.xml. -->
+		     reasoning as identity-service's pom.xml. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>

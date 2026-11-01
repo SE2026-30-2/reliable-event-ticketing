@@ -17,9 +17,9 @@ Tài liệu mô tả từng luồng từ góc nhìn người dùng và quy tắc
 
 | Actor | Làm gì | Xác thực |
 |---|---|---|
-| Quản trị nền tảng (`ADMIN`) | mọi thao tác trên **mọi** sự kiện; cấp/thu role `ORGANIZER`; hoàn tiền VNPay | JWT từ `user-service` |
+| Quản trị nền tảng (`ADMIN`) | mọi thao tác trên **mọi** sự kiện; cấp/thu role `ORGANIZER`; hoàn tiền VNPay | JWT từ `identity-service` |
 | Nhà tổ chức (`ORGANIZER`) | tạo và quản lý **sự kiện của mình**: loại vé, coupon, khách mời, thiết bị, dashboard, báo cáo; không thấy dữ liệu của tổ chức khác | JWT (role `ORGANIZER`) |
-| Người mua | xem/tìm sự kiện (công khai); đặt chỗ (cần email đã xác minh), thanh toán, xem/gửi lại/chuyển nhượng vé, vào danh sách chờ | tài khoản `user-service` (JWT) |
+| Người mua | xem/tìm sự kiện (công khai); đặt chỗ (cần email đã xác minh), thanh toán, xem/gửi lại/chuyển nhượng vé, vào danh sách chờ | tài khoản `identity-service` (JWT) |
 | Nhân viên check-in | quét QR bằng thiết bị đã đăng ký | `X-Device-Key` |
 
 ## 1. Chuẩn bị sự kiện (ORGANIZER hoặc ADMIN)
