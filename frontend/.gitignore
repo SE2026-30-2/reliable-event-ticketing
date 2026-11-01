@@ -73,3 +73,5 @@ dist-ssr
 !/tests/live-backend.spec.mjs
 !/tests/live-cleanup.mjs
 !/tests/navigation.spec.mjs
+
+pnpm-lock.yaml

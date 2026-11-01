@@ -32,9 +32,9 @@ Hệ thống sử dụng kiến trúc microservices với event-driven architect
     └────────────┬───────────────────┘
                  │
     ┌────────────▼───────────────────┐
-    │      PostgreSQL Databases      │
+    │   PostgreSQL (one container)   │
     │  - identity_service (5436)     │
-    │  - ticketing_platform (5437)   │
+    │  - ticketing_platform (5436)   │
     └────────────────────────────────┘
 ```
 

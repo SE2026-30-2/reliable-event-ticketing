@@ -1,5 +1,9 @@
 # GateKeep - Chạy local và vận hành
 
+## Docker PostgreSQL migration
+
+Both databases now share one PostgreSQL container. Before starting the apps with existing volumes, follow [postgres-migration.md](postgres-migration.md).
+
 ## Yêu cầu
 
 - **JDK 21** (cần `javac`, không chỉ JRE — build lỗi `release version 21 not supported` nghĩa là máy chỉ có JRE; đặt `JAVA_HOME` tới một JDK 21)
@@ -9,19 +13,16 @@
 
 ## Chạy toàn bộ bằng Docker Compose
 
-Cần file `.env` (không nằm trong git): compose **từ chối chạy** nếu thiếu mật khẩu DB. Dockerfile của từng app chỉ `COPY target/*.jar`, nên **phải build jar trước** (dùng `clean` để không sót file cũ trong `target/`):
+Cần file `.env` (không nằm trong git): Compose từ chối chạy nếu thiếu mật khẩu DB. Các Dockerfile build ứng dụng trong container:
 
 ```bash
 cp .env.example .env     # rồi sửa mật khẩu; bản mẫu đã bật chế độ demo (xem bảng dưới)
-
-(cd backend/user-service && ./mvnw -DskipTests clean package)
-(cd backend/ticketing-platform && ./mvnw -DskipTests clean package)
 
 docker compose up -d --build
 docker compose ps        # đợi tất cả (healthy), app mất ~40s
 ```
 
-Frontend chạy riêng (không nằm trong compose):
+Frontend cũng có thể chạy riêng để phát triển:
 
 ```bash
 cd frontend
@@ -30,7 +31,7 @@ npm install
 npm run dev              # http://localhost:5173
 ```
 
-Dừng: `docker compose down` (thêm `-v` để xóa cả volume DB và khóa ký). Đổi `*_DB_PASSWORD` sau khi volume đã tạo **không** đổi mật khẩu trong DB cũ — cần `down -v` (mất dữ liệu) hoặc `ALTER USER`.
+Dừng: `docker compose down` (thêm `-v` sẽ xóa volume DB và khóa ký). Đổi mật khẩu trong `.env` sau khi volume đã tạo không đổi mật khẩu trong PostgreSQL; cập nhật role tương ứng bằng `ALTER ROLE` trước khi áp dụng cấu hình mới.
 
 ## Bảng port
 
@@ -42,8 +43,8 @@ Dừng: `docker compose down` (thêm `-v` để xóa cả volume DB và khóa k�
 | Kafka UI | 8086 | chỉ bind loopback |
 | Kafka broker | 9092 (host) / 29092 (trong mạng compose) | loopback |
 | Zookeeper | 2181 | loopback |
-| Postgres `ticketing_platform` | 5437 | loopback, user/pass `postgres/postgres` |
-| Postgres `user_service` | 5436 | loopback |
+| PostgreSQL `ticketing_platform` | 5436 | loopback, user `ticketing_app` |
+| PostgreSQL `identity_service` | 5436 | loopback, user `identity_app` |
 
 ## Biến môi trường
 
@@ -51,8 +52,8 @@ Compose đã đặt sẵn giá trị đúng cho mạng nội bộ; dưới đây
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
-| `SPRING_DATASOURCE_URL/USERNAME` | `jdbc:postgresql://localhost:5437/ticketing_platform` / `postgres` | DB |
-| `SPRING_DATASOURCE_PASSWORD` | **bắt buộc, không có mặc định** | app không khởi động nếu thiếu; compose lấy từ `TICKETING_DB_PASSWORD` / `USER_DB_PASSWORD` trong `.env` |
+| `SPRING_DATASOURCE_URL/USERNAME` | `jdbc:postgresql://localhost:5436/ticketing_platform` / `ticketing_app` | DB |
+| `SPRING_DATASOURCE_PASSWORD` | **bắt buộc, không có mặc định** | app không khởi động nếu thiếu; compose lấy từ `TICKETING_DB_PASSWORD` / `IDENTITY_DB_PASSWORD` trong `.env` |
 | `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | trong compose: `broker:29092` |
 | `SECURITY_JWT_JWK_SET_URI` | `http://localhost:8087/.well-known/jwks.json` | nơi lấy public key của user-service |
 | `TICKETING_QR_PRIVATE_KEY_PATH` | `./keys/ticket_signing_key.pem` | khóa ký QR; compose mount volume `ticketing-platform-keys` |
@@ -97,17 +98,17 @@ Mã hóa chữ ký (HMAC-SHA512) được kiểm thử bằng giá trị tính �
 Giữ hạ tầng trong compose, chạy app bằng Maven. Mật khẩu DB không còn mặc định trong code nên phải nạp từ `.env`:
 
 ```bash
-docker compose up -d postgres-ticketing-platform postgres-user-service zookeeper broker
+docker compose up -d postgres zookeeper broker
 set -a; source .env; set +a
-(cd backend/user-service && SPRING_DATASOURCE_PASSWORD=$USER_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$USER_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
-(cd backend/ticketing-platform && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
+(cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
+(cd backend && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 ```
 
 Lần đầu `ticketing-platform` tự sinh khóa ký tại `./keys/ticket_signing_key.pem` (thư mục này bị `.gitignore`).
 
 ## Tài khoản mặc định
 
-Chỉ khi `.env` có `USER_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `user-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
+Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `user-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
 
 ### Cấp quyền nhà tổ chức (ORGANIZER)
 
@@ -229,10 +230,10 @@ curl -s localhost:8091/api/checkin/events/$EVENT/stats -H "$A"
 ## Kiểm thử
 
 ```bash
-cd backend/ticketing-platform
+cd backend
 ./mvnw test -Dtest='!*IT'                       # unit + context smoke (H2, không cần Docker)
 ./mvnw test -Dtest='*IT'                        # Docker, Postgres + Kafka thật: CheckinRecordConcurrencyIT, ReservationPaymentFlowIT, VnpayPaymentFlowIT, LifecycleIT
-cd ../user-service && ./mvnw test
+cd identity-service && ./mvnw test
 cd ../../frontend && npm test                    # vitest: xác minh QR trên thiết bị
 npm run build                                   # tsc + vite build
 ```
@@ -251,7 +252,7 @@ Test `*IT` cố ý không nằm trong luồng mặc định/CI (cần Docker đ�
 | `docker compose up --build` báo không thấy jar | chưa chạy `./mvnw package` cho app đó |
 | `ticketing-platform` mãi không healthy | cần `user-service`, Postgres và broker healthy trước; xem `docker compose logs ticketing-platform` |
 | Vé kẹt ở `RESERVED` sau khi thanh toán | listener Kafka chưa nhận: kiểm tra broker, topic `payment-completed` trong Kafka UI (:8086) và DLT `*.DLT` |
-| `docker compose up` báo thiếu `TICKETING_DB_PASSWORD`/`USER_DB_PASSWORD` | chưa có `.env`: `cp .env.example .env` |
+| `docker compose up` báo thiếu `TICKETING_DB_PASSWORD`/`IDENTITY_DB_PASSWORD` | chưa có `.env`: `cp .env.example .env` |
 | user-service: `Found more than one migration with version 2` | file migration cũ còn trong `target/`; build với `./mvnw clean package` |
 | `POST /reservations` hoặc `/payment/requests` trả 401 | thiếu/hết hạn JWT (15 phút): đăng nhập lại — mua vé giờ cần tài khoản |
 | `GET /api/ticket/{id}` trả 404 dù vé có thật | vé thuộc tài khoản khác (cố ý trả 404 thay vì 403); ADMIN đọc được mọi vé |

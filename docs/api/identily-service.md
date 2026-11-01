@@ -2,7 +2,7 @@
 
 Identity Provider của hệ thống: đăng ký/đăng nhập bằng email + mật khẩu, xác minh email, đặt lại mật khẩu, quản lý role (`USER`, `ORGANIZER`, `ADMIN`), và là nơi **duy nhất phát hành JWT (RS256)**. `ticketing-platform` chỉ **xác minh** JWT qua JWKS của service này, không chia sẻ secret.
 
-Base URL `http://localhost:8087` (container nghe trực tiếp ở 8087). Swagger: `/swagger-ui.html`. DB: PostgreSQL `user_service` (host port 5436), migration `V1__init.sql` (cùng `db/dev-seed/V2__seed_admin.sql` khi bật seed dev).
+Base URL `http://localhost:8087` (container nghe trực tiếp ở 8087). Swagger: `/swagger-ui.html`. DB: PostgreSQL `identity_service` (host port 5436), migration `V1__init.sql` (cùng `db/dev-seed/V2__seed_admin.sql` khi bật seed dev).
 
 **Xác thực**: 🔓 công khai · 🔐 cần `Authorization: Bearer <accessToken>` · 🔑 cần thêm `ROLE_ADMIN`.
 

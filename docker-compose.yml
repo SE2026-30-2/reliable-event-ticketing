@@ -8,17 +8,17 @@ services:
     restart: unless-stopped
     mem_limit: 768m
     ports:
-      - "8087:8087"
+      - "127.0.0.1:8087:8087"
     volumes:
       - identity-service-keys:/app/keys
     depends_on:
-      postgres-identity-service:
+      postgres:
         condition: service_healthy
       broker:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-identity-service:5432/identity_service
-      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/identity_service
+      SPRING_DATASOURCE_USERNAME: identity_app
       SPRING_DATASOURCE_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD in .env (see .env.example)}
       SPRING_FLYWAY_LOCATIONS: ${IDENTITY_SERVICE_FLYWAY_LOCATIONS:-classpath:db/migration}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:29092
@@ -30,21 +30,24 @@ services:
       retries: 10
       start_period: 40s
 
-  postgres-identity-service:
+  # One PostgreSQL instance, with an isolated database and role per service.
+  postgres:
     image: postgres:16-alpine
-    container_name: postgres-identity-service
+    container_name: postgres
     restart: unless-stopped
     mem_limit: 512m
     ports:
       - "127.0.0.1:5436:5432"
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD in .env (see .env.example)}
-      POSTGRES_DB: identity_service
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD in .env (see .env.example)}}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD in .env (see .env.example)}
+      TICKETING_DB_PASSWORD: ${TICKETING_DB_PASSWORD:?set TICKETING_DB_PASSWORD in .env (see .env.example)}
     volumes:
-      - postgres-identity-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d postgres -tAc \"SELECT count(*) = 2 FROM pg_database WHERE datname IN ('identity_service', 'ticketing_platform')\" | grep -qx t"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -61,11 +64,11 @@ services:
     restart: unless-stopped
     mem_limit: 768m
     ports:
-      - "8091:8080"
+      - "127.0.0.1:8091:8080"
     volumes:
       - ticketing-platform-keys:/app/keys
     depends_on:
-      postgres-ticketing-platform:
+      postgres:
         condition: service_healthy
       broker:
         condition: service_healthy
@@ -73,8 +76,8 @@ services:
         condition: service_healthy
     environment:
       SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-ticketing-platform:5432/ticketing_platform
-      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ticketing_platform
+      SPRING_DATASOURCE_USERNAME: ticketing_app
       SPRING_DATASOURCE_PASSWORD: ${TICKETING_DB_PASSWORD:?set TICKETING_DB_PASSWORD in .env (see .env.example)}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:29092
       SECURITY_JWT_JWK_SET_URI: http://identity-service:8087/.well-known/jwks.json
@@ -109,25 +112,24 @@ services:
       retries: 10
       start_period: 40s
 
-  postgres-ticketing-platform:
-    image: postgres:16-alpine
-    container_name: postgres-ticketing-platform
+  # Frontend (React + Vite, served by unprivileged Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_USER_SERVICE_URL: ${VITE_USER_SERVICE_URL:-http://localhost:5173}
+        VITE_TICKETING_SERVICE_URL: ${VITE_TICKETING_SERVICE_URL:-http://localhost:5173}
+    image: reliable-event-ticketing-frontend:local
+    container_name: frontend
     restart: unless-stopped
-    mem_limit: 512m
     ports:
-      - "127.0.0.1:5437:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${TICKETING_DB_PASSWORD:?set TICKETING_DB_PASSWORD in .env (see .env.example)}
-      POSTGRES_DB: ticketing_platform
-    volumes:
-      - postgres-ticketing-platform-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      - "5173:8080"
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      ticketing-platform:
+        condition: service_healthy
 
   # Kafka Infrastructure
   zookeeper:
@@ -194,7 +196,6 @@ services:
       start_period: 20s
 
 volumes:
-  postgres-identity-data:
+  postgres-data:
   identity-service-keys:
-  postgres-ticketing-platform-data:
   ticketing-platform-keys:

@@ -4,8 +4,11 @@ Hai database PostgreSQL 16 riêng biệt, schema do Flyway quản lý; Hibernate
 
 | Database | Chủ sở hữu | Host port (local) |
 |---|---|---|
-| `ticketing_platform` | `ticketing-platform` | 5437 |
-| `user_service` | `user-service` (xem [api/user-service.md](api/user-service.md)) | 5436 |
+| `ticketing_platform` | `ticketing-platform` (`ticketing_app`) | 5436 |
+| `identity_service` | `identity-service` (`identity_app`) | 5436 |
+
+Both databases run in the same PostgreSQL container with separate roles. See
+[postgres-migration.md](postgres-migration.md) before moving existing data.
 
 ## ticketing_platform
 
