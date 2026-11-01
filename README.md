@@ -99,7 +99,7 @@ npm run dev
 
 ### Hạ Tầng
 
-- PostgreSQL databases (ports 5436, 5437)
+- One PostgreSQL container (host port 5436), with separate `identity_service` and `ticketing_platform` databases. Existing installations should follow [the database migration guide](docs/postgres-migration.md) before starting the applications.
 - Apache Kafka + Zookeeper (ports 9092, 2181)
 - Kafka UI (port 8086)
 
