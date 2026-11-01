@@ -129,6 +129,25 @@ services:
       retries: 10
       start_period: 10s
 
+  # Frontend (React + Vite, served by unprivileged Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_USER_SERVICE_URL: ${VITE_USER_SERVICE_URL:-http://localhost:8087}
+        VITE_TICKETING_SERVICE_URL: ${VITE_TICKETING_SERVICE_URL:-http://localhost:8091}
+    image: reliable-event-ticketing-frontend:local
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "5173:8080"
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      ticketing-platform:
+        condition: service_healthy
+
   # Kafka Infrastructure
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
