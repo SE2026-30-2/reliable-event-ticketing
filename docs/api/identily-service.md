@@ -1,4 +1,4 @@
-# GateKeep - user-service API Reference
+# GateKeep - identity-service API Reference
 
 Identity Provider của hệ thống: đăng ký/đăng nhập bằng email + mật khẩu, xác minh email, đặt lại mật khẩu, quản lý role (`USER`, `ORGANIZER`, `ADMIN`), và là nơi **duy nhất phát hành JWT (RS256)**. `ticketing-platform` chỉ **xác minh** JWT qua JWKS của service này, không chia sẻ secret.
 
@@ -56,7 +56,7 @@ Body lỗi dạng `{ "message": "...", "details": [...] }`.
 - Claims: `sub` = **email** (không phải UUID), `roles` = danh sách tên role **không có tiền tố `ROLE_`** (service tiêu thụ tự thêm `ROLE_`), `email_verified` (boolean; `ticketing-platform` dùng để chặn mua khi chưa xác minh mà không phải gọi lại đây), `iat`, `exp`. Đổi role/xác minh email chỉ phản ánh vào token **mới** — dùng `POST /api/user/refresh`.
 - TTL: access 900s, refresh 604800s (`security.jwt.access-token-ttl-seconds`, `refresh-token-ttl-seconds`).
 - **Refresh token rotation**: mỗi lần `refresh` thu hồi token đã dùng và cấp cặp mới.
-- Khóa ký là file PEM (`security.jwt.private-key-path`, mặc định `./keys/private_key.pem`; compose mount volume `user-service-keys`). Thiếu file thì tự sinh khóa mới — mọi JWT đã phát mất hiệu lực. Khóa cố định, không rotation.
+- Khóa ký là file PEM (`security.jwt.private-key-path`, mặc định `./keys/private_key.pem`; compose mount volume `identity-service-keys`). Thiếu file thì tự sinh khóa mới — mọi JWT đã phát mất hiệu lực. Khóa cố định, không rotation.
 
 ## Khóa tài khoản và đặt lại mật khẩu
 

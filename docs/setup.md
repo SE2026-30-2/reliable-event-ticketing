@@ -39,7 +39,7 @@ Dừng: `docker compose down` (thêm `-v` sẽ xóa volume DB và khóa ký). Đ
 |---|---|---|
 | Frontend (Vite dev) | 5173 | |
 | `ticketing-platform` | 8091 | container nghe 8080 (`SERVER_PORT`), map `8091:8080`; Swagger `/swagger-ui.html` |
-| `user-service` | 8087 | Swagger `/swagger-ui.html` |
+| `identity-service` | 8087 | Swagger `/swagger-ui.html` |
 | Kafka UI | 8086 | chỉ bind loopback |
 | Kafka broker | 9092 (host) / 29092 (trong mạng compose) | loopback |
 | Zookeeper | 2181 | loopback |
@@ -55,7 +55,7 @@ Compose đã đặt sẵn giá trị đúng cho mạng nội bộ; dưới đây
 | `SPRING_DATASOURCE_URL/USERNAME` | `jdbc:postgresql://localhost:5436/ticketing_platform` / `ticketing_app` | DB |
 | `SPRING_DATASOURCE_PASSWORD` | **bắt buộc, không có mặc định** | app không khởi động nếu thiếu; compose lấy từ `TICKETING_DB_PASSWORD` / `IDENTITY_DB_PASSWORD` trong `.env` |
 | `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | trong compose: `broker:29092` |
-| `SECURITY_JWT_JWK_SET_URI` | `http://localhost:8087/.well-known/jwks.json` | nơi lấy public key của user-service |
+| `SECURITY_JWT_JWK_SET_URI` | `http://localhost:8087/.well-known/jwks.json` | nơi lấy public key của identity-service |
 | `TICKETING_QR_PRIVATE_KEY_PATH` | `./keys/ticket_signing_key.pem` | khóa ký QR; compose mount volume `ticketing-platform-keys` |
 | `TICKETING_QR_REQUIRE_EXISTING_KEY` | `false` | `true` = không tự sinh khóa mới khi thiếu file (bật sau lần khởi động đầu, vì đổi khóa vô hiệu mọi QR đã phát) |
 | `TICKETING_RESERVATION_EXPIRY_MINUTES` | `10` | thời gian giữ chỗ chưa thanh toán |
@@ -74,7 +74,7 @@ Compose đã đặt sẵn giá trị đúng cho mạng nội bộ; dưới đây
 | `TICKETING_RATE_LIMIT_TRUST_FORWARDED_FOR` | `false` | `true` **chỉ** khi sau reverse proxy luôn ghi đè `X-Forwarded-For`; ngược lại client tự bịa IP để né giới hạn |
 | `TICKETING_OUTBOX_RETENTION_DAYS` | `7` | giữ dòng outbox đã relay bao lâu trước khi xóa |
 | `MANAGEMENT_ENDPOINTS_EXPOSURE` | `health,info` | endpoint Actuator được mở (cả hai app); thêm `prometheus` chỉ khi cổng được bảo vệ ở tầng mạng |
-| `SPRING_FLYWAY_LOCATIONS` (user-service) | `classpath:db/migration` | `.env.example` thêm `classpath:db/dev-seed` để seed ADMIN demo — **không dùng ở nơi thật** |
+| `SPRING_FLYWAY_LOCATIONS` (identity-service) | `classpath:db/migration` | `.env.example` thêm `classpath:db/dev-seed` để seed ADMIN demo — **không dùng ở nơi thật** |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | cả hai app |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | dùng dựng link trong email xác thực/đặt lại mật khẩu |
 | `MAIL_HOST/PORT/USERNAME/PASSWORD` | Mailtrap sandbox, rỗng | tài khoản SMTP; thiếu thì app vẫn chạy nhưng gửi mail lỗi (chỉ log) |
@@ -108,7 +108,7 @@ Lần đầu `ticketing-platform` tự sinh khóa ký tại `./keys/ticket_signi
 
 ## Tài khoản mặc định
 
-Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `user-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
+Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `identity-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
 
 ### Cấp quyền nhà tổ chức (ORGANIZER)
 
@@ -126,7 +126,7 @@ Tài khoản ORGANIZER chỉ thấy và quản lý sự kiện **do chính mình
 1. Đăng ký tài khoản bình thường qua `POST /api/user/register` (role mặc định `USER`).
 2. Nâng quyền trực tiếp trong DB một lần:
    ```sql
-   -- trong database user_service
+   -- trong database identity_service
    INSERT INTO user_roles (user_id, role)
    SELECT id, 'ADMIN' FROM users WHERE email = 'ban@congty.vn';
    ```
@@ -134,7 +134,7 @@ Tài khoản ORGANIZER chỉ thấy và quản lý sự kiện **do chính mình
 
 ## Cấu hình email (SMTP)
 
-Email dùng cho: xác minh tài khoản và đặt lại mật khẩu (user-service), vé kèm QR, thông báo vé bị hủy/hoàn/chuyển nhượng, và lời mời từ danh sách chờ (ticketing-platform). Điền vào `.env` rồi chạy `docker compose up -d user-service ticketing-platform`:
+Email dùng cho: xác minh tài khoản và đặt lại mật khẩu (identity-service), vé kèm QR, thông báo vé bị hủy/hoàn/chuyển nhượng, và lời mời từ danh sách chờ (ticketing-platform). Điền vào `.env` rồi chạy `docker compose up -d identity-service ticketing-platform`:
 
 ```text
 MAIL_HOST=smtp.example.com
@@ -207,7 +207,7 @@ curl -s localhost:8091/api/checkin/events/$EVENT/stats -H "$A"
 - Mất hoặc sinh lại khóa ⇒ **mọi QR đã phát thành `INVALID_SIGNATURE`**, không có cách phát lại ngầm. Khóa nằm ở volume `ticketing-platform-keys` (`/app/keys/ticket_signing_key.pem`).
 - Sau lần khởi động đầu (đã có file khóa), đặt `TICKETING_QR_REQUIRE_EXISTING_KEY=true` để app **từ chối khởi động** thay vì âm thầm sinh khóa mới khi mất file.
 - Backup khóa (có thể dùng container tạm): `docker run --rm -v cms_ticketing-platform-keys:/k -v "$PWD":/b alpine cp /k/ticket_signing_key.pem /b/`. Giữ bản backup như một secret; `**/keys/` đã được `.gitignore`.
-- Chưa có rotation (một `kid` cố định). Tương tự với khóa JWT của `user-service` (volume `user-service-keys`), nhưng JWT chỉ sống 15 phút nên hậu quả nhẹ hơn nhiều.
+- Chưa có rotation (một `kid` cố định). Tương tự với khóa JWT của `identity-service` (volume `identity-service-keys`), nhưng JWT chỉ sống 15 phút nên hậu quả nhẹ hơn nhiều.
 
 ### Kafka: retry, DLT và quan sát
 
@@ -240,20 +240,16 @@ npm run build                                   # tsc + vite build
 
 Test `*IT` cố ý không nằm trong luồng mặc định/CI (cần Docker đáng tin cậy); chạy theo yêu cầu bằng `-Dtest=`.
 
-## CI
-
-`.github/workflows/backend-ci.yml`: matrix `[user-service, ticketing-platform]` chạy `./mvnw -B clean verify`, sau đó job `docker-compose-smoke-test` dựng cả stack và đợi mọi container `healthy`.
-
 ## Troubleshooting
 
 | Triệu chứng | Nguyên nhân / cách xử lý |
 |---|---|
 | `release version 21 not supported` khi build | chỉ có JRE; cài/đặt `JAVA_HOME` tới JDK 21 |
 | `docker compose up --build` báo không thấy jar | chưa chạy `./mvnw package` cho app đó |
-| `ticketing-platform` mãi không healthy | cần `user-service`, Postgres và broker healthy trước; xem `docker compose logs ticketing-platform` |
+| `ticketing-platform` mãi không healthy | cần `identity-service`, Postgres và broker healthy trước; xem `docker compose logs ticketing-platform` |
 | Vé kẹt ở `RESERVED` sau khi thanh toán | listener Kafka chưa nhận: kiểm tra broker, topic `payment-completed` trong Kafka UI (:8086) và DLT `*.DLT` |
 | `docker compose up` báo thiếu `TICKETING_DB_PASSWORD`/`IDENTITY_DB_PASSWORD` | chưa có `.env`: `cp .env.example .env` |
-| user-service: `Found more than one migration with version 2` | file migration cũ còn trong `target/`; build với `./mvnw clean package` |
+| identity-service: `Found more than one migration with version 2` | file migration cũ còn trong `target/`; build với `./mvnw clean package` |
 | `POST /reservations` hoặc `/payment/requests` trả 401 | thiếu/hết hạn JWT (15 phút): đăng nhập lại — mua vé giờ cần tài khoản |
 | `GET /api/ticket/{id}` trả 404 dù vé có thật | vé thuộc tài khoản khác (cố ý trả 404 thay vì 403); ADMIN đọc được mọi vé |
 | `POST /reservations` hoặc `/payment/requests` trả 429 | vượt giới hạn IP (xem `Retry-After`) hoặc email đang giữ quá nhiều vé `RESERVED` |
