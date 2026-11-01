@@ -9,8 +9,8 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 
 # Vite embeds these values into the static bundle at build time.
-ARG VITE_USER_SERVICE_URL
-ARG VITE_TICKETING_SERVICE_URL
+ARG VITE_USER_SERVICE_URL=http://localhost:5173
+ARG VITE_TICKETING_SERVICE_URL=http://localhost:5173
 ENV VITE_USER_SERVICE_URL=${VITE_USER_SERVICE_URL}
 ENV VITE_TICKETING_SERVICE_URL=${VITE_TICKETING_SERVICE_URL}
 

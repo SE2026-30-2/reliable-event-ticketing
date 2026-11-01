@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     mem_limit: 768m
     ports:
-      - "8087:8087"
+      - "127.0.0.1:8087:8087"
     volumes:
       - identity-service-keys:/app/keys
     depends_on:
@@ -61,7 +61,7 @@ services:
     restart: unless-stopped
     mem_limit: 768m
     ports:
-      - "8091:8080"
+      - "127.0.0.1:8091:8080"
     volumes:
       - ticketing-platform-keys:/app/keys
     depends_on:
@@ -135,8 +135,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_USER_SERVICE_URL: ${VITE_USER_SERVICE_URL:-http://localhost:8087}
-        VITE_TICKETING_SERVICE_URL: ${VITE_TICKETING_SERVICE_URL:-http://localhost:8091}
+        VITE_USER_SERVICE_URL: ${VITE_USER_SERVICE_URL:-http://localhost:5173}
+        VITE_TICKETING_SERVICE_URL: ${VITE_TICKETING_SERVICE_URL:-http://localhost:5173}
     image: reliable-event-ticketing-frontend:local
     container_name: frontend
     restart: unless-stopped
