@@ -13,6 +13,8 @@ import {
   Loading,
   Screen,
   Title,
+  InfoRow,
+  Notice,
 } from "@/components/ui-kit";
 import { useResource } from "@/hooks/use-resource";
 import { post } from "@/lib/api";
@@ -146,28 +148,54 @@ function CheckoutContent() {
     remaining > 0;
   return (
     <Screen>
-      <Title>Thanh toán đặt vé</Title>
+      <Title>Thanh toán</Title>
+      <Body muted>Hoàn tất thanh toán để giữ chỗ sự kiện</Body>
       <Body muted>Mã đặt vé: {id}</Body>
       <Feedback message={resource.error || error} />
       {resource.loading && <Loading />}
       {!!tickets.length && (
-        <Card>
-          <Heading>Thông tin người nhận</Heading>
-          <Body>
-            {tickets[0].holderName} · {tickets[0].holderEmail}
-          </Body>
-          <Body>Số vé: {tickets.length}</Body>
-          <Body>
-            Giá vé:{" "}
-            {money(tickets.reduce((sum, ticket) => sum + ticket.priceCents, 0))}
-          </Body>
-          <Body muted>Hạn giữ vé: {dateTime(expiresAt)}</Body>
+        <>
           {canPay && (
-            <Body>
-              Còn {Math.floor(remaining / 60)} phút {remaining % 60} giây
-            </Body>
+            <Notice>
+              Thời gian giữ chỗ:{" "}
+              {String(Math.floor(remaining / 60)).padStart(2, "0")}:
+              {String(remaining % 60).padStart(2, "0")} · Vui lòng thanh toán
+              trước khi hết hạn.
+            </Notice>
           )}
-        </Card>
+          <Card>
+            <Heading>Thông tin người nhận</Heading>
+            <Body>
+              {tickets[0].holderName} · {tickets[0].holderEmail}
+            </Body>
+            <Body>Số vé: {tickets.length}</Body>
+            <Body>
+              Giá vé:{" "}
+              {money(
+                tickets.reduce((sum, ticket) => sum + ticket.priceCents, 0),
+              )}
+            </Body>
+            <Body muted>Hạn giữ vé: {dateTime(expiresAt)}</Body>
+            {canPay && (
+              <Body>
+                Còn {Math.floor(remaining / 60)} phút {remaining % 60} giây
+              </Body>
+            )}
+          </Card>
+          <Card>
+            <Heading>Thông tin vé</Heading>
+            <InfoRow label="Số vé" value={tickets.length} />
+            <InfoRow
+              label="Tạm tính"
+              value={money(
+                tickets.reduce((sum, ticket) => sum + ticket.priceCents, 0),
+              )}
+            />
+            <Body muted>
+              Tổng thanh toán được xác nhận từ máy chủ khi tạo giao dịch.
+            </Body>
+          </Card>
+        </>
       )}
       {payment ? (
         <Card>

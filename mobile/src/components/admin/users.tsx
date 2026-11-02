@@ -1,4 +1,7 @@
 import { useCallback, useRef, useState } from "react";
+import { View, Text } from "react-native";
+import { RecordActions } from "../record-actions";
+import { FilterPanel } from "../filter-panel";
 import { useAuth } from "@/contexts/auth";
 import { identity } from "@/lib/api";
 import { adminUsers, normalizeSearch } from "@/lib/management";
@@ -13,6 +16,7 @@ import {
   Field,
   Heading,
   Loading,
+  MetricStrip,
 } from "../ui-kit";
 import { FilterOptions } from "../filter-options";
 import { ConfirmButton } from "../confirm-button";
@@ -119,6 +123,31 @@ export function AdminUsers() {
   return (
     <>
       <Heading>Quản lý người dùng</Heading>
+      {!resource.loading && !resource.error && (
+        <MetricStrip
+          items={[
+            {
+              label: "Tổng người dùng",
+              value: resource.data?.length ?? 0,
+              icon: "user",
+            },
+            {
+              label: "Nhà tổ chức",
+              value:
+                resource.data?.filter((user) =>
+                  user.roles.includes("ORGANIZER"),
+                ).length ?? 0,
+              icon: "ticket",
+            },
+            {
+              label: "Đã xác thực",
+              value:
+                resource.data?.filter((user) => user.emailVerified).length ?? 0,
+              icon: "shield",
+            },
+          ]}
+        />
+      )}
       <Field
         label="Tìm người dùng theo tên hoặc email"
         value={query}
@@ -128,49 +157,51 @@ export function AdminUsers() {
           setPage(0);
         }}
       />
-      <FilterOptions
-        label="Vai trò"
-        value={role}
-        options={[
-          ["", "Tất cả vai trò"],
-          ["USER", "Người mua"],
-          ["ORGANIZER", "Ban tổ chức"],
-          ["ADMIN", "Quản trị viên"],
-        ]}
-        disabled={busy}
-        onChange={(value) => {
-          setRole(value);
-          setPage(0);
-        }}
-      />
-      <FilterOptions
-        label="Trạng thái tài khoản"
-        value={status}
-        options={[
-          ["", "Tất cả tài khoản"],
-          ["ACTIVE", "Đang hoạt động"],
-          ["LOCKED", "Đã khóa"],
-        ]}
-        disabled={busy}
-        onChange={(value) => {
-          setStatus(value);
-          setPage(0);
-        }}
-      />
-      <FilterOptions
-        label="Xác minh email"
-        value={verified}
-        options={[
-          ["", "Tất cả email"],
-          ["true", "Đã xác minh"],
-          ["false", "Chưa xác minh"],
-        ]}
-        disabled={busy}
-        onChange={(value) => {
-          setVerified(value);
-          setPage(0);
-        }}
-      />
+      <FilterPanel>
+        <FilterOptions
+          label="Vai trò"
+          value={role}
+          options={[
+            ["", "Tất cả vai trò"],
+            ["USER", "Người mua"],
+            ["ORGANIZER", "Ban tổ chức"],
+            ["ADMIN", "Quản trị viên"],
+          ]}
+          disabled={busy}
+          onChange={(value) => {
+            setRole(value);
+            setPage(0);
+          }}
+        />
+        <FilterOptions
+          label="Trạng thái tài khoản"
+          value={status}
+          options={[
+            ["", "Tất cả tài khoản"],
+            ["ACTIVE", "Đang hoạt động"],
+            ["LOCKED", "Đã khóa"],
+          ]}
+          disabled={busy}
+          onChange={(value) => {
+            setStatus(value);
+            setPage(0);
+          }}
+        />
+        <FilterOptions
+          label="Xác minh email"
+          value={verified}
+          options={[
+            ["", "Tất cả email"],
+            ["true", "Đã xác minh"],
+            ["false", "Chưa xác minh"],
+          ]}
+          disabled={busy}
+          onChange={(value) => {
+            setVerified(value);
+            setPage(0);
+          }}
+        />
+      </FilterPanel>
       <Feedback message={resource.error || error} retry={resource.reload} />
       {!!notice && <Body>{notice}</Body>}
       {resource.loading ? (
@@ -185,48 +216,92 @@ export function AdminUsers() {
             {users
               .slice(currentPage * 20, (currentPage + 1) * 20)
               .map((user) => (
-                <Card key={user.id}>
-                  <Heading>{user.fullName}</Heading>
-                  <Body>{user.email}</Body>
+                <Card key={user.id} style={{ padding: 10, gap: 5 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 10,
+                      alignItems: "center",
+                      paddingRight: 26,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: "#eee6ff",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ color: "#653cff", fontWeight: "800" }}>
+                        {user.fullName
+                          ?.trim()
+                          .split(/\s+/)
+                          .map((n) => n[0])
+                          .slice(-2)
+                          .join("")}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: "#11113d",
+                          fontWeight: "700",
+                        }}
+                      >
+                        {user.fullName}
+                      </Text>
+                      <Text
+                        style={{ fontSize: 11, color: "#595b7b", marginTop: 3 }}
+                      >
+                        {user.email}
+                      </Text>
+                    </View>
+                  </View>
                   <Badge>
                     {user.status} ·{" "}
                     {user.emailVerified ? "Đã xác minh" : "Chưa xác minh"}
                   </Badge>
-                  <Body muted>
-                    {user.roles.join(", ")} · {dateTime(user.createdAt)}
-                  </Body>
-                  <Button
-                    secondary
-                    title={
-                      detail === user.id
-                        ? "Đóng chi tiết người dùng"
-                        : "Xem chi tiết người dùng"
-                    }
-                    onPress={() => setDetail(detail === user.id ? "" : user.id)}
-                  />
-                  {detail === user.id && (
-                    <UserDetails key={user.id} id={user.id} />
-                  )}
-                  <ConfirmButton
-                    title={
-                      user.status === "LOCKED"
-                        ? "Mở khóa tài khoản"
-                        : "Khóa tài khoản"
-                    }
-                    disabled={busy || current?.id === user.id}
-                    description={`Thay đổi trạng thái tài khoản ${user.email}?`}
-                    onConfirm={() => update(user, "status")}
-                  />
-                  <ConfirmButton
-                    title={
-                      user.roles.includes("ORGANIZER")
-                        ? "Gỡ quyền tổ chức"
-                        : "Cấp quyền tổ chức"
-                    }
-                    disabled={busy || current?.id === user.id}
-                    description={`Thay đổi quyền tổ chức sự kiện của ${user.email}?`}
-                    onConfirm={() => update(user, "roles")}
-                  />
+                  <Body muted>{user.roles.join(", ")}</Body>
+                  <RecordActions label={user.fullName}>
+                    <Button
+                      secondary
+                      title={
+                        detail === user.id
+                          ? "Đóng chi tiết người dùng"
+                          : "Xem chi tiết người dùng"
+                      }
+                      onPress={() =>
+                        setDetail(detail === user.id ? "" : user.id)
+                      }
+                    />
+                    {detail === user.id && (
+                      <UserDetails key={user.id} id={user.id} />
+                    )}
+                    <ConfirmButton
+                      title={
+                        user.status === "LOCKED"
+                          ? "Mở khóa tài khoản"
+                          : "Khóa tài khoản"
+                      }
+                      disabled={busy || current?.id === user.id}
+                      description={`Thay đổi trạng thái tài khoản ${user.email}?`}
+                      onConfirm={() => update(user, "status")}
+                    />
+                    <ConfirmButton
+                      title={
+                        user.roles.includes("ORGANIZER")
+                          ? "Gỡ quyền tổ chức"
+                          : "Cấp quyền tổ chức"
+                      }
+                      disabled={busy || current?.id === user.id}
+                      description={`Thay đổi quyền tổ chức sự kiện của ${user.email}?`}
+                      onConfirm={() => update(user, "roles")}
+                    />
+                  </RecordActions>
                 </Card>
               ))}
             <Button

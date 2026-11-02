@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import {
   Badge,
   Body,
@@ -14,6 +14,9 @@ import {
   Screen,
   Title,
   styles,
+  Banner,
+  MetricStrip,
+  InfoRow,
 } from "@/components/ui-kit";
 import { EventForm } from "@/components/event-form";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -89,22 +92,28 @@ function ManagementContent() {
   const resource = useResource(load);
   return (
     <Screen>
-      <Title>{resource.data?.name || "Quản lý sự kiện"}</Title>
+      <Title>Chi tiết quản trị sự kiện</Title>
+      {resource.data && (
+        <>
+          <Banner uri={resource.data.bannerUrl} />
+          <Heading>{resource.data.name}</Heading>
+          <Badge>{resource.data.status}</Badge>
+          <Body muted>{dateTime(resource.data.startsAt)}</Body>
+          <Body muted>{resource.data.venue}</Body>
+        </>
+      )}
       <Feedback message={resource.error} retry={resource.reload} />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-      >
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
         {Object.entries(tabs).map(([key, label]) => (
           <Button
+            compact
             key={key}
             title={label}
             secondary={key !== tab}
             onPress={() => setTab(key as Tab)}
           />
         ))}
-      </ScrollView>
+      </View>
       {resource.loading ? (
         <Loading />
       ) : (
@@ -281,6 +290,27 @@ function ManagementPanel({
           {tab === "overview" && (
             <Card>
               <Heading>Báo cáo sự kiện</Heading>
+              <MetricStrip
+                items={[
+                  {
+                    label: "Vé phát hành",
+                    value: (data as Report).totals.ticketsIssued,
+                    icon: "ticket",
+                  },
+                  {
+                    label: "Đã check-in",
+                    value: (data as Report).totals.checkedIn,
+                    icon: "scan",
+                  },
+                  {
+                    label: "Chưa tham dự",
+                    value: (data as Report).totals.noShow,
+                    icon: "user",
+                  },
+                ]}
+              />
+              <InfoRow label="Thời gian" value={dateTime(event.startsAt)} />
+              <InfoRow label="Địa điểm" value={event.venue} />
               <Body muted>
                 Cập nhật: {dateTime((data as Report).generatedAt)}
               </Body>

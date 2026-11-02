@@ -138,6 +138,9 @@ test("screen 13 clears a previous accepted verdict when the next scan cannot be 
 }) => {
   await page.goto("/checkin");
   await page
+    .getByRole("button", { name: "Cài đặt thiết bị", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Tự đồng bộ: Bật", exact: true })
     .click();
   await page.getByLabel("Khóa thiết bị", { exact: true }).fill("device");
@@ -305,10 +308,17 @@ test("screen 16 filters globally and fetches authoritative user details", async 
   await page
     .getByLabel("Tìm người dùng theo tên hoặc email")
     .fill("nguyen thi an");
+  await page.getByRole("button", { name: "Bộ lọc", exact: true }).click();
   await page
     .getByRole("button", { name: "Chưa xác minh", exact: true })
     .click();
   await expect(page.getByText(buyer.email, { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: `Thao tác với ${buyer.fullName}`,
+      exact: true,
+    })
+    .click();
   await page
     .getByRole("button", { name: "Xem chi tiết người dùng", exact: true })
     .click();
@@ -342,6 +352,9 @@ test("screen 17 chooses an event, shows a selectable one-time key and copies it"
   });
   await page.goto("/admin");
   await page.getByRole("button", { name: "Thiết bị", exact: true }).click();
+  await page
+    .getByRole("button", { name: "+ Tạo thiết bị mới", exact: true })
+    .click();
   await page.getByLabel("Tên thiết bị", { exact: true }).fill("Gate A");
   await page
     .getByRole("button", { name: "Gắn với sự kiện", exact: true })
@@ -377,6 +390,40 @@ test("screen 17 chooses an event, shows a selectable one-time key and copies it"
     .click();
   await expect(
     page.getByText("one-time-test-device-key", { exact: true }),
+  ).toHaveCount(0);
+});
+
+test("screen 17 keeps creation errors visible inside the open sheet and retains the device name", async ({
+  page,
+}) => {
+  await page.route("**/api/checkin/devices", (route) =>
+    route.request().method() === "POST"
+      ? json(route, { message: "Không thể tạo thiết bị lúc này" }, 500)
+      : route.fallback(),
+  );
+  await page.goto("/admin");
+  await page.getByRole("button", { name: "Thiết bị", exact: true }).click();
+  await page
+    .getByRole("button", { name: "+ Tạo thiết bị mới", exact: true })
+    .click();
+  await page
+    .getByLabel("Tên thiết bị", { exact: true })
+    .fill("Cổng cần thử lại");
+  await page.getByRole("button", { name: "Tạo thiết bị", exact: true }).click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Không thể tạo thiết bị lúc này" })
+      .last(),
+  ).toBeInViewport();
+  await expect(page.getByLabel("Tên thiết bị", { exact: true })).toHaveValue(
+    "Cổng cần thử lại",
+  );
+  await page
+    .getByRole("button", { name: "Đóng đăng ký thiết bị", exact: true })
+    .click();
+  await expect(
+    page.getByText("Khóa thiết bị mới", { exact: true }),
   ).toHaveCount(0);
 });
 

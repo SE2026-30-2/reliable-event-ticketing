@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Icon } from "@/components/eventhub-icons";
 import { colors, Loading } from "@/components/ui-kit";
 import { useAuth } from "@/contexts/auth";
 export default function TabLayout() {
@@ -11,7 +11,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerTitle: "EventPass",
+        headerShown: false,
+        headerTitle: "EventHub",
         headerTitleStyle: {
           color: colors.primary,
           fontWeight: "800",
@@ -20,7 +21,12 @@ export default function TabLayout() {
         headerShadowVisible: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { borderTopColor: colors.line },
+        tabBarStyle: {
+          borderTopColor: colors.line,
+          backgroundColor: "#fff",
+          minHeight: 62,
+          paddingTop: 7,
+        },
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
@@ -29,7 +35,7 @@ export default function TabLayout() {
         options={{
           title: "Khám phá",
           tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 24 }}>⌂</Text>
+            <Icon name="home" color={color} size={23} />
           ),
         }}
       />
@@ -38,7 +44,7 @@ export default function TabLayout() {
         options={{
           title: "Vé của tôi",
           tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 23 }}>▤</Text>
+            <Icon name="ticket" color={color} size={23} />
           ),
         }}
       />
@@ -48,7 +54,7 @@ export default function TabLayout() {
           title: "Tổ chức",
           href: manager ? "/(tabs)/manage" : null,
           tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 23 }}>▦</Text>
+            <Icon name="calendar" color={color} size={23} />
           ),
         }}
       />
@@ -57,7 +63,7 @@ export default function TabLayout() {
         options={{
           title: "Tài khoản",
           tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 23 }}>◎</Text>
+            <Icon name="user" color={color} size={23} />
           ),
         }}
       />

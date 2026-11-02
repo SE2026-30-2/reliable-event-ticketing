@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useNetworkState } from "expo-network";
-import { AppState, View } from "react-native";
+import { AppState, View, Text } from "react-native";
 import {
   Badge,
   Body,
@@ -13,6 +13,8 @@ import {
   Heading,
   Screen,
   Title,
+  Notice,
+  Icon,
 } from "@/components/ui-kit";
 import {
   certificate,
@@ -24,6 +26,7 @@ import {
   type Scan,
 } from "@/lib/checkin";
 import { dateTime, messageOf } from "@/lib/types";
+import { FilterPanel } from "@/components/filter-panel";
 
 export default function Checkin() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -173,72 +176,95 @@ export default function Checkin() {
   );
   return (
     <Screen>
-      <Title>Soát vé sự kiện</Title>
+      <Title>Soát vé tại cổng</Title>
+      <Body muted>Kiểm tra và xác thực vé tham dự sự kiện</Body>
       <Badge>
         {network.isConnected === false ? "NGOẠI TUYẾN" : "CÓ KẾT NỐI MẠNG"}
       </Badge>
-      <Body muted>
-        Dùng khóa thiết bị do ban tổ chức cấp. Khi mất mạng, kết quả kiểm tra
-        chữ ký là tạm thời; đồng bộ để máy chủ xác nhận.
-      </Body>
       <Feedback message={error} />
       {!!notice && <Body>{notice}</Body>}
-      <Card>
-        <Field
-          label="Khóa thiết bị"
-          value={deviceKey}
-          onChangeText={(value) => {
-            setDeviceKey(value);
-            setHistory([]);
-            setResult(undefined);
+      <FilterPanel title="Cài đặt thiết bị">
+        <Card>
+          <Field
+            label="Khóa thiết bị"
+            value={deviceKey}
+            onChangeText={(value) => {
+              setDeviceKey(value);
+              setHistory([]);
+              setResult(undefined);
+            }}
+            secureTextEntry
+            autoCapitalize="none"
+            editable={!busy}
+          />
+          <Field
+            label="Mã sự kiện để kiểm tra offline"
+            value={eventId}
+            onChangeText={setEventId}
+            autoCapitalize="none"
+            editable={!busy}
+          />
+          <Body muted>
+            Nhập đúng mã sự kiện để tạm chấp nhận vé khi offline. Thiếu mã sự
+            kiện hoặc chứng thư sẽ cần chờ máy chủ.
+          </Body>
+          <Body muted>Chứng thư: {dateTime(certificateAt)}</Body>
+          <Button
+            secondary
+            title="Cập nhật chứng thư offline"
+            disabled={!ready}
+            busy={busy}
+            onPress={() =>
+              act(async () => {
+                setCertificateAt((await refreshCertificate()).updatedAt);
+                setNotice("Đã lưu chứng thư xác minh chữ ký QR.");
+              })
+            }
+          />
+          <Badge>CHỜ ĐỒNG BỘ: {pending}</Badge>
+          <Button
+            title="Đồng bộ lượt quét"
+            disabled={!ready || !deviceKey.trim() || pending === 0}
+            busy={busy}
+            onPress={sync}
+          />
+          <Button
+            secondary
+            title={autoSync ? "Tự đồng bộ: Bật" : "Tự đồng bộ: Tắt"}
+            disabled={busy}
+            onPress={() => setAutoSync(!autoSync)}
+          />
+          <Body muted>
+            Hàng đợi được lưu trên thiết bị, giữ nguyên mã idempotency khi thử
+            lại. Offline không kiểm tra được vé bị thu hồi hoặc lượt đã dùng
+            trên thiết bị khác.
+          </Body>
+        </Card>
+      </FilterPanel>
+      {!camera && (
+        <View
+          style={{
+            height: 205,
+            borderRadius: 18,
+            backgroundColor: "#241746",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 14,
           }}
-          secureTextEntry
-          autoCapitalize="none"
-          editable={!busy}
-        />
-        <Field
-          label="Mã sự kiện để kiểm tra offline"
-          value={eventId}
-          onChangeText={setEventId}
-          autoCapitalize="none"
-          editable={!busy}
-        />
-        <Body muted>
-          Nhập đúng mã sự kiện để tạm chấp nhận vé khi offline. Thiếu mã sự kiện
-          hoặc chứng thư sẽ cần chờ máy chủ.
-        </Body>
-        <Body muted>Chứng thư: {dateTime(certificateAt)}</Body>
-        <Button
-          secondary
-          title="Cập nhật chứng thư offline"
-          disabled={!ready}
-          busy={busy}
-          onPress={() =>
-            act(async () => {
-              setCertificateAt((await refreshCertificate()).updatedAt);
-              setNotice("Đã lưu chứng thư xác minh chữ ký QR.");
-            })
-          }
-        />
-        <Badge>CHỜ ĐỒNG BỘ: {pending}</Badge>
-        <Button
-          title="Đồng bộ lượt quét"
-          disabled={!ready || !deviceKey.trim() || pending === 0}
-          busy={busy}
-          onPress={sync}
-        />
-        <Button
-          secondary
-          title={autoSync ? "Tự đồng bộ: Bật" : "Tự đồng bộ: Tắt"}
-          disabled={busy}
-          onPress={() => setAutoSync(!autoSync)}
-        />
-        <Body muted>
-          Hàng đợi được lưu trên thiết bị, giữ nguyên mã idempotency khi thử
-          lại. Offline không kiểm tra được vé bị thu hồi hoặc lượt đã dùng trên
-          thiết bị khác.
-        </Body>
-      </Card>
+        >
+          <Icon name="scan" color="#c4b1ff" size={72} />
+          <Text
+            style={{
+              color: "#ded5f2",
+              fontSize: 13,
+              paddingHorizontal: 22,
+              textAlign: "center",
+            }}
+          >
+            Chọn quét camera hoặc nhập nội dung QR bên dưới.
+          </Text>
+        </View>
+      )}
       <Card>
         <Button
           secondary
@@ -291,7 +317,14 @@ export default function Checkin() {
         />
       </Card>
       {camera && focused && foreground && permission?.granted && (
-        <View style={{ height: 320, overflow: "hidden", borderRadius: 22 }}>
+        <View
+          style={{
+            height: 260,
+            overflow: "hidden",
+            borderRadius: 18,
+            backgroundColor: "#201842",
+          }}
+        >
           <CameraView
             style={{ flex: 1 }}
             facing="back"
@@ -300,10 +333,44 @@ export default function Checkin() {
               void scan(data);
             }}
           />
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: "14%",
+              left: "18%",
+              width: "64%",
+              height: "72%",
+              borderWidth: 3,
+              borderColor: "#b8a2ff",
+              borderRadius: 18,
+            }}
+          >
+            <View
+              style={{
+                position: "absolute",
+                top: "50%",
+                height: 2,
+                backgroundColor: "#5cf59c",
+                width: "100%",
+              }}
+            />
+          </View>
         </View>
       )}
       {result && (
-        <Card>
+        <Card
+          style={{
+            backgroundColor:
+              result.outcome === "ACCEPTED" ? "#e4f8ea" : "#fff1f3",
+            borderColor: result.outcome === "ACCEPTED" ? "#a9dfb9" : "#ffc4d0",
+          }}
+        >
+          <Icon
+            name={result.outcome === "ACCEPTED" ? "check" : "close"}
+            color={result.outcome === "ACCEPTED" ? "#138b35" : "#c32943"}
+            size={32}
+          />
           <Badge>
             {result.pending
               ? "KẾT QUẢ OFFLINE · CHỜ ĐỒNG BỘ"
@@ -327,6 +394,10 @@ export default function Checkin() {
           </Body>
         </Card>
       )}
+      <Notice>
+        Sẵn sàng hoạt động ngoại tuyến. Lượt quét được lưu trên thiết bị và đồng
+        bộ khi có kết nối; kết quả offline là tạm thời.
+      </Notice>
       <Heading>Lịch sử thiết bị ({history.length})</Heading>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {[

@@ -1,15 +1,18 @@
 import { useRef, useState } from "react";
-import { Body, Button, Card } from "@/components/ui-kit";
+import { Body, Button } from "@/components/ui-kit";
+import { BottomSheet } from "./bottom-sheet";
 export function ConfirmButton({
   title,
   description,
   onConfirm,
   disabled,
+  danger = true,
 }: {
   title: string;
   description: string;
   onConfirm: () => Promise<void>;
   disabled?: boolean;
+  danger?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -17,17 +20,17 @@ export function ConfirmButton({
   if (!confirming)
     return (
       <Button
-        danger
+        danger={danger}
         title={title}
         disabled={disabled}
         onPress={() => setConfirming(true)}
       />
     );
   return (
-    <Card>
+    <BottomSheet title={title} close={() => setConfirming(false)} busy={busy}>
       <Body>{description}</Body>
       <Button
-        danger
+        danger={danger}
         title={`Xác nhận ${title.toLowerCase()}`}
         busy={busy}
         disabled={disabled}
@@ -50,6 +53,6 @@ export function ConfirmButton({
         disabled={busy}
         onPress={() => setConfirming(false)}
       />
-    </Card>
+    </BottomSheet>
   );
 }

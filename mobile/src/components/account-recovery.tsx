@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { View, Text } from "react-native";
+import { AuthArtwork } from "./auth-artwork";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   Body,
@@ -8,6 +10,8 @@ import {
   Field,
   Screen,
   Title,
+  Notice,
+  styles,
 } from "@/components/ui-kit";
 import { useAuth } from "@/contexts/auth";
 import { identity } from "@/lib/api";
@@ -89,12 +93,32 @@ export function AccountRecovery({
     }
   }
   return (
-    <Screen>
-      <Title>{title}</Title>
-      <Card>
+    <Screen auth>
+      {mode === "verify" && <AuthArtwork kind="mail" />}
+      <View style={styles.center}>
+        <Title>
+          {mode === "verify" && notice ? "Email đã được xác minh!" : title}
+        </Title>
+        <Text style={[styles.muted, { textAlign: "center" }]}>
+          {mode === "forgot"
+            ? "Nhập email đã đăng ký với EventHub, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu cho bạn."
+            : mode === "reset"
+              ? "Tạo mật khẩu mới để tiếp tục sử dụng tài khoản EventHub của bạn."
+              : "Xác minh email để khám phá và tham gia các sự kiện trên EventHub."}
+        </Text>
+      </View>
+      {mode === "reset" && <AuthArtwork kind="lock" />}
+      <Card
+        style={{
+          borderWidth: 0,
+          backgroundColor: "transparent",
+          padding: 0,
+          gap: 16,
+        }}
+      >
         <Feedback message={error} />
         {notice ? (
-          <Body>{notice}</Body>
+          <Notice success>{notice}</Notice>
         ) : (
           <>
             <Body muted>
@@ -142,9 +166,32 @@ export function AccountRecovery({
                 />
               </>
             )}
-            <Button title={title} busy={busy} onPress={submit} />
+            <Button
+              title={
+                mode === "forgot"
+                  ? "Gửi hướng dẫn"
+                  : mode === "reset"
+                    ? "Lưu mật khẩu mới"
+                    : title
+              }
+              icon={mode === "forgot" ? "mail" : "lock"}
+              busy={busy}
+              onPress={submit}
+            />
           </>
         )}
+        {mode === "verify" && notice && (
+          <Button
+            title="Khám phá sự kiện"
+            icon="calendar"
+            onPress={() => router.replace("/(tabs)")}
+          />
+        )}
+        <Notice>
+          {mode === "reset"
+            ? "Mật khẩu cần ít nhất 8 ký tự. Hãy sử dụng mật khẩu riêng cho tài khoản của bạn."
+            : "Vui lòng kiểm tra cả thư mục Spam (Thư rác) nếu không thấy email."}
+        </Notice>
         {mode === "forgot" && (
           <Button
             secondary

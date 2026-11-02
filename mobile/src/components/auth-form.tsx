@@ -1,13 +1,17 @@
 import { useState } from "react";
+import { View, Text, Pressable } from "react-native";
+import { AuthArtwork } from "./auth-artwork";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   Screen,
   Title,
-  Body,
   Card,
   Field,
   Button,
   Feedback,
+  Notice,
+  styles,
+  colors,
 } from "@/components/ui-kit";
 import { useAuth } from "@/contexts/auth";
 import { identity } from "@/lib/api";
@@ -19,7 +23,6 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -62,21 +65,31 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
     }
   }
   return (
-    <Screen>
-      <Title>
-        {register ? "Tham gia cùng EventPass" : "Chào mừng trở lại!"}
-      </Title>
-      <Body muted>
-        {register
-          ? "Tạo tài khoản để khám phá sự kiện và quản lý vé điện tử."
-          : "Đăng nhập để tiếp tục những trải nghiệm đáng nhớ."}
-      </Body>
-      <Card>
+    <Screen auth>
+      <View style={styles.center}>
+        <Title>{register ? "Tạo tài khoản ngay" : "Chào mừng trở lại"}</Title>
+        <Text style={[styles.muted, { textAlign: "center" }]}>
+          {register
+            ? "Chỉ vài bước đơn giản để trở thành thành viên của EventHub và khám phá thế giới sự kiện!"
+            : "Đăng nhập để tiếp tục khám phá và tham gia những sự kiện hấp dẫn trên EventHub!"}
+        </Text>
+      </View>
+      <AuthArtwork />
+      <Card
+        style={{
+          borderWidth: 0,
+          backgroundColor: "transparent",
+          padding: 0,
+          gap: 14,
+        }}
+      >
         <Feedback message={error || (!register ? auth.sessionError : "")} />
         {success ? (
           <>
             <Title>Đăng ký thành công</Title>
-            <Body>Kiểm tra hộp thư để xác minh email trước khi đặt vé.</Body>
+            <Notice success>
+              Kiểm tra hộp thư để xác minh email trước khi đặt vé.
+            </Notice>
             <Button
               title="Đăng nhập"
               onPress={() =>
@@ -106,7 +119,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
               label="Mật khẩu"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!visible}
+              secureTextEntry
               autoCapitalize="none"
               autoComplete={register ? "new-password" : "current-password"}
             />
@@ -115,27 +128,38 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
                 label="Xác nhận mật khẩu"
                 value={confirm}
                 onChangeText={setConfirm}
-                secureTextEntry={!visible}
+                secureTextEntry
                 autoCapitalize="none"
               />
             )}
-            <Button
-              secondary
-              title={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              onPress={() => setVisible(!visible)}
-            />
+            {!register && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/forgot-password")}
+                style={{ alignSelf: "flex-end", paddingVertical: 4 }}
+              >
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontWeight: "600",
+                    fontSize: 13,
+                  }}
+                >
+                  Quên mật khẩu
+                </Text>
+              </Pressable>
+            )}
+            {register && (
+              <Notice>
+                Thông tin tài khoản dùng để nhận vé và quản lý các sự kiện bạn
+                tham gia.
+              </Notice>
+            )}
             <Button
               title={register ? "Đăng ký tài khoản" : "Đăng nhập"}
               busy={busy}
               onPress={submit}
             />
-            {!register && (
-              <Button
-                secondary
-                title="Quên mật khẩu"
-                onPress={() => router.push("/forgot-password")}
-              />
-            )}
             <Button
               secondary
               title="Xác minh email"

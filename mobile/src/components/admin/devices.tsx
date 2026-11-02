@@ -16,6 +16,10 @@ import {
 import { FilterOptions } from "../filter-options";
 import { ConfirmButton } from "../confirm-button";
 import { DeviceKey } from "../device-key";
+import { RecordActions } from "../record-actions";
+import { Icon } from "../eventhub-icons";
+import { BottomSheet } from "../bottom-sheet";
+import { FilterPanel } from "../filter-panel";
 
 const loadDevices = (signal: AbortSignal) =>
   request<Device[]>("/api/checkin/devices", { signal });
@@ -23,6 +27,7 @@ export function AdminDevices() {
   const resource = useResource(loadDevices);
   const events = useResource(managementEvents);
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
   const [scope, setScope] = useState("");
   const [status, setStatus] = useState("");
   const [limit, setLimit] = useState(20);
@@ -93,6 +98,7 @@ export function AdminDevices() {
         );
       setKey(result.apiKey);
       setLabel("");
+      setCreating(false);
     });
   }
   return (
@@ -119,19 +125,21 @@ export function AdminDevices() {
           setLimit(20);
         }}
       />
-      <FilterOptions
-        label="Trạng thái thiết bị"
-        value={status}
-        options={[
-          ["", "Tất cả trạng thái"],
-          ["ACTIVE", "Đang hoạt động"],
-          ["REVOKED", "Đã thu hồi"],
-        ]}
-        onChange={(value) => {
-          setStatus(value);
-          setLimit(20);
-        }}
-      />
+      <FilterPanel>
+        <FilterOptions
+          label="Trạng thái thiết bị"
+          value={status}
+          options={[
+            ["", "Tất cả trạng thái"],
+            ["ACTIVE", "Đang hoạt động"],
+            ["REVOKED", "Đã thu hồi"],
+          ]}
+          onChange={(value) => {
+            setStatus(value);
+            setLimit(20);
+          }}
+        />
+      </FilterPanel>
       <Feedback message={resource.error || error} retry={resource.reload} />
       {!!notice && <Body>{notice}</Body>}
       {resource.loading ? (
@@ -145,45 +153,52 @@ export function AdminDevices() {
             )}
             {devices.slice(0, limit).map((device) => (
               <Card key={device.deviceId}>
+                <Icon name="scan" size={24} />
                 <Heading>{device.label}</Heading>
                 <Badge>{device.status}</Badge>
                 <Body>Sự kiện: {eventName(device.eventId)}</Body>
-                <Button
-                  secondary
-                  title={
-                    detail === device.deviceId
-                      ? "Đóng chi tiết thiết bị"
-                      : "Xem chi tiết thiết bị"
-                  }
-                  onPress={() =>
-                    setDetail(detail === device.deviceId ? "" : device.deviceId)
-                  }
-                />
-                {detail === device.deviceId && (
-                  <>
-                    <Body>Mã thiết bị: {device.deviceId}</Body>
-                    <Body muted>Tạo lúc: {dateTime(device.createdAt)}</Body>
-                    <Body muted>
-                      Hoạt động lần cuối: {dateTime(device.lastSeenAt)}
-                    </Body>
-                    <Body muted>Thu hồi lúc: {dateTime(device.revokedAt)}</Body>
-                  </>
-                )}
-                {device.status === "ACTIVE" && (
-                  <ConfirmButton
-                    title="Thu hồi thiết bị"
-                    disabled={busy}
-                    description={`Thu hồi quyền soát vé của ${device.label}? Khóa không thể kích hoạt lại.`}
-                    onConfirm={() =>
-                      act(async () => {
-                        await patch(
-                          `/api/checkin/devices/${encodeURIComponent(device.deviceId)}/revoke`,
-                        );
-                        setNotice("Đã thu hồi thiết bị.");
-                      })
+                <RecordActions label={device.label}>
+                  <Button
+                    secondary
+                    title={
+                      detail === device.deviceId
+                        ? "Đóng chi tiết thiết bị"
+                        : "Xem chi tiết thiết bị"
+                    }
+                    onPress={() =>
+                      setDetail(
+                        detail === device.deviceId ? "" : device.deviceId,
+                      )
                     }
                   />
-                )}
+                  {detail === device.deviceId && (
+                    <>
+                      <Body>Mã thiết bị: {device.deviceId}</Body>
+                      <Body muted>Tạo lúc: {dateTime(device.createdAt)}</Body>
+                      <Body muted>
+                        Hoạt động lần cuối: {dateTime(device.lastSeenAt)}
+                      </Body>
+                      <Body muted>
+                        Thu hồi lúc: {dateTime(device.revokedAt)}
+                      </Body>
+                    </>
+                  )}
+                  {device.status === "ACTIVE" && (
+                    <ConfirmButton
+                      title="Thu hồi thiết bị"
+                      disabled={busy}
+                      description={`Thu hồi quyền soát vé của ${device.label}? Khóa không thể kích hoạt lại.`}
+                      onConfirm={() =>
+                        act(async () => {
+                          await patch(
+                            `/api/checkin/devices/${encodeURIComponent(device.deviceId)}/revoke`,
+                          );
+                          setNotice("Đã thu hồi thiết bị.");
+                        })
+                      }
+                    />
+                  )}
+                </RecordActions>
               </Card>
             ))}
             {devices.length > limit && (
@@ -197,79 +212,99 @@ export function AdminDevices() {
         )
       )}
       {key && <DeviceKey value={key} onClose={() => setKey("")} />}
-      <Card>
-        <Heading>Đăng ký thiết bị</Heading>
-        <Field
-          label="Tên thiết bị"
-          value={label}
-          maxLength={255}
-          editable={!busy && !key}
-          onChangeText={setLabel}
-        />
-        <FilterOptions
-          label="Loại thiết bị mới"
-          value={creatingScope}
-          disabled={busy || !!key}
-          options={[
-            ["global", "Tạo thiết bị toàn hệ thống"],
-            ["event", "Gắn với sự kiện"],
-          ]}
-          onChange={setCreatingScope}
-        />
-        {creatingScope === "event" && (
-          <>
-            <Feedback message={events.error} retry={events.reload} />
-            {events.loading ? (
-              <Loading />
-            ) : (
+      <Button
+        title="+ Tạo thiết bị mới"
+        onPress={() => setCreating(true)}
+        disabled={busy || !!key}
+      />
+      {creating && (
+        <BottomSheet
+          title="Đăng ký thiết bị"
+          close={() => setCreating(false)}
+          busy={busy}
+        >
+          <Card
+            style={{
+              borderWidth: 0,
+              padding: 0,
+              backgroundColor: "transparent",
+            }}
+          >
+            <Feedback message={error} />
+            <Field
+              label="Tên thiết bị"
+              value={label}
+              maxLength={255}
+              editable={!busy && !key}
+              onChangeText={setLabel}
+            />
+            <FilterOptions
+              label="Loại thiết bị mới"
+              value={creatingScope}
+              disabled={busy || !!key}
+              options={[
+                ["global", "Tạo thiết bị toàn hệ thống"],
+                ["event", "Gắn với sự kiện"],
+              ]}
+              onChange={setCreatingScope}
+            />
+            {creatingScope === "event" && (
               <>
-                <Field
-                  label="Tìm sự kiện để gắn thiết bị"
-                  value={eventQuery}
-                  editable={!busy && !key}
-                  onChangeText={(value) => {
-                    setEventQuery(value);
-                    setEventLimit(10);
-                  }}
-                />
-                <Body>
-                  Đã chọn: {eventId ? eventName(eventId) : "Chưa chọn sự kiện"}
-                </Body>
-                {options.slice(0, eventLimit).map((event) => (
-                  <Button
-                    key={event.eventId}
-                    title={`Chọn sự kiện: ${event.name}`}
-                    secondary={eventId !== event.eventId}
-                    disabled={busy || !!key}
-                    onPress={() => setEventId(event.eventId)}
-                  />
-                ))}
-                {!options.length && (
-                  <Body muted>Không có sự kiện phù hợp.</Body>
-                )}
-                {options.length > eventLimit && (
-                  <Button
-                    secondary
-                    title="Xem thêm lựa chọn sự kiện"
-                    onPress={() => setEventLimit(eventLimit + 10)}
-                  />
+                <Feedback message={events.error} retry={events.reload} />
+                {events.loading ? (
+                  <Loading />
+                ) : (
+                  <>
+                    <Field
+                      label="Tìm sự kiện để gắn thiết bị"
+                      value={eventQuery}
+                      editable={!busy && !key}
+                      onChangeText={(value) => {
+                        setEventQuery(value);
+                        setEventLimit(10);
+                      }}
+                    />
+                    <Body>
+                      Đã chọn:{" "}
+                      {eventId ? eventName(eventId) : "Chưa chọn sự kiện"}
+                    </Body>
+                    {options.slice(0, eventLimit).map((event) => (
+                      <Button
+                        key={event.eventId}
+                        title={`Chọn sự kiện: ${event.name}`}
+                        secondary={eventId !== event.eventId}
+                        disabled={busy || !!key}
+                        onPress={() => setEventId(event.eventId)}
+                      />
+                    ))}
+                    {!options.length && (
+                      <Body muted>Không có sự kiện phù hợp.</Body>
+                    )}
+                    {options.length > eventLimit && (
+                      <Button
+                        secondary
+                        title="Xem thêm lựa chọn sự kiện"
+                        onPress={() => setEventLimit(eventLimit + 10)}
+                      />
+                    )}
+                  </>
                 )}
               </>
             )}
-          </>
-        )}
-        <Button
-          title="Tạo thiết bị"
-          busy={busy}
-          disabled={
-            !label.trim() ||
-            !!key ||
-            (creatingScope === "event" &&
-              (!eventId || events.loading || !!events.error))
-          }
-          onPress={create}
-        />
-      </Card>
+            <Button
+              title="Tạo thiết bị"
+              busy={busy}
+              disabled={
+                !label.trim() ||
+                !!key ||
+                (creatingScope === "event" &&
+                  (!eventId || events.loading || !!events.error))
+              }
+              onPress={create}
+            />
+          </Card>
+        </BottomSheet>
+      )}
       <Button
         secondary
         title="Tải lại thiết bị"

@@ -15,9 +15,13 @@ import { messageOf, type Event } from "@/lib/types";
 export function EventForm({
   event,
   onSaved,
+  onBusyChange,
+  embedded = false,
 }: {
   event?: Event;
   onSaved: () => void;
+  onBusyChange?: (busy: boolean) => void;
+  embedded?: boolean;
 }) {
   const [name, setName] = useState(event?.name || "");
   const [venue, setVenue] = useState(event?.venue || "");
@@ -60,6 +64,7 @@ export function EventForm({
     }
     lock.current = true;
     setBusy(true);
+    onBusyChange?.(true);
     const body = {
       name: name.trim(),
       venue: venue.trim(),
@@ -78,11 +83,20 @@ export function EventForm({
     } finally {
       lock.current = false;
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
   return (
-    <Card>
-      <Heading>{event ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}</Heading>
+    <Card
+      style={
+        embedded
+          ? { borderWidth: 0, padding: 0, backgroundColor: "transparent" }
+          : undefined
+      }
+    >
+      {!embedded && (
+        <Heading>{event ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}</Heading>
+      )}
       <Feedback message={error} />
       {final && (
         <Heading>Sự kiện đã kết thúc hoặc bị hủy, không thể chỉnh sửa.</Heading>

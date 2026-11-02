@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
+import { FilterOptions } from "@/components/filter-options";
 import {
   Badge,
   Body,
@@ -65,18 +67,18 @@ function TicketsContent() {
     <Screen>
       <Title>Vé của tôi & Hàng đợi</Title>
       <Body muted>Quản lý vé đã đặt và theo dõi danh sách chờ.</Body>
-      <View style={styles.row}>
-        <Button
-          title="Vé của tôi"
-          secondary={tab !== "tickets"}
-          onPress={() => setTab("tickets")}
-        />
-        <Button
-          title="Danh sách chờ"
-          secondary={tab !== "waitlist"}
-          onPress={() => setTab("waitlist")}
-        />
-      </View>
+      <FilterOptions
+        label="Quản lý vé"
+        value={tab}
+        options={[
+          ["tickets", "Vé của tôi"],
+          ["waitlist", "Danh sách chờ"],
+        ]}
+        onChange={(value) => {
+          setTab(value as "tickets" | "waitlist");
+          setPage(0);
+        }}
+      />
       <Feedback message={resource.error || error} retry={resource.reload} />
       {resource.loading ? (
         <Loading />
@@ -186,6 +188,20 @@ function TicketsContent() {
 function TicketCard({ ticket }: { ticket: Ticket }) {
   return (
     <Card>
+      {ticket.status === "ISSUED" && ticket.qrPayload && (
+        <View
+          style={{
+            alignSelf: "flex-start",
+            padding: 7,
+            backgroundColor: "#fff",
+            borderRadius: 7,
+          }}
+          accessibilityRole="image"
+          accessibilityLabel="QR vé đã phát hành"
+        >
+          <QRCode value={ticket.qrPayload} size={64} />
+        </View>
+      )}
       <Badge>{ticket.status}</Badge>
       <Heading>{ticket.holderName}</Heading>
       <Body muted>{ticket.holderEmail}</Body>

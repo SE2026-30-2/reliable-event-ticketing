@@ -14,11 +14,20 @@ import {
   Loading,
   Screen,
   Title,
+  Banner,
+  Notice,
+  InfoRow,
 } from "@/components/ui-kit";
 import { ConfirmButton } from "@/components/confirm-button";
 import { useResource } from "@/hooks/use-resource";
 import { post, request } from "@/lib/api";
-import { dateTime, isEmail, messageOf, type Ticket } from "@/lib/types";
+import {
+  dateTime,
+  isEmail,
+  messageOf,
+  type Ticket,
+  type Event,
+} from "@/lib/types";
 function TicketContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const load = useCallback(
@@ -33,6 +42,19 @@ function TicketContent() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const ticket = resource.data;
+  const eventId = ticket?.eventId;
+  const eventInfo = useResource(
+    useCallback(
+      (signal: AbortSignal) =>
+        eventId
+          ? request<Event>(`/api/event/${encodeURIComponent(eventId)}`, {
+              signal,
+              public: true,
+            }).catch(() => null)
+          : Promise.resolve(null),
+      [eventId],
+    ),
+  );
   async function transfer() {
     setError("");
     setNotice("");
@@ -53,7 +75,7 @@ function TicketContent() {
   }
   return (
     <Screen>
-      <Title>Vé điện tử</Title>
+      <Title>Chi tiết vé</Title>
       <Feedback
         message={resource.error || error}
         retry={resource.error ? resource.reload : undefined}
@@ -65,26 +87,47 @@ function TicketContent() {
         ticket &&
         !resource.error && (
           <>
-            <Card>
-              <Badge>{ticket.status}</Badge>
-              <Heading>{ticket.holderName}</Heading>
-              <Body>{ticket.holderEmail}</Body>
-              <Body muted>Mã vé: {ticket.ticketId}</Body>
-              <Body muted>
-                Hiệu lực: {dateTime(ticket.validFrom)} →{" "}
-                {dateTime(ticket.validUntil)}
-              </Body>
+            {eventInfo.data && (
+              <>
+                <Banner uri={eventInfo.data.bannerUrl} compact />
+                <Heading>{eventInfo.data.name}</Heading>
+                <Body muted>{eventInfo.data.venue}</Body>
+                <Body muted>{dateTime(eventInfo.data.startsAt)}</Body>
+              </>
+            )}
+            <Card
+              style={{
+                backgroundColor: "#f5f1ff",
+                alignItems: "center",
+                borderStyle: "dashed",
+                paddingVertical: 22,
+              }}
+            >
               {ticket.status === "ISSUED" && ticket.qrPayload ? (
                 <View
                   accessibilityLabel="Mã QR vé"
                   accessibilityRole="image"
-                  style={{ alignItems: "center", paddingVertical: 20 }}
+                  style={{ alignItems: "center", paddingVertical: 4 }}
                 >
                   <QRCode value={ticket.qrPayload} size={220} />
                 </View>
               ) : (
                 <Body muted>Mã QR chỉ được hiển thị khi vé đã phát hành.</Body>
               )}
+              <Badge>{ticket.status}</Badge>
+              <Body muted>Thời gian check-in hợp lệ:</Body>
+              <Body>
+                {dateTime(ticket.validFrom)} → {dateTime(ticket.validUntil)}
+              </Body>
+              <Notice>
+                Không chia sẻ mã QR này cho người khác để tránh rủi ro bị từ
+                chối check-in.
+              </Notice>
+            </Card>
+            <Card>
+              <InfoRow label="Mã vé" value={ticket.ticketId} />
+              <InfoRow label="Người nhận" value={ticket.holderName} />
+              <InfoRow label="Email" value={ticket.holderEmail} />
               <Button
                 secondary
                 title="Gửi lại email vé"

@@ -2,7 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { post, request } from "@/lib/api";
 import { isUuid } from "@/lib/management";
 import { dateTime, messageOf, money, type Payment } from "@/lib/types";
-import { Badge, Body, Button, Card, Feedback, Field, Heading } from "../ui-kit";
+import {
+  Badge,
+  Body,
+  Button,
+  Card,
+  Feedback,
+  Field,
+  Heading,
+  InfoRow,
+  Notice,
+} from "../ui-kit";
 import { FilterOptions } from "../filter-options";
 import { ConfirmButton } from "../confirm-button";
 
@@ -166,11 +176,12 @@ export function AdminPayments() {
         />
       </Card>
       <Feedback message={error} />
-      {!!notice && <Body>{notice}</Body>}
+      {!!notice && <Notice success>{notice}</Notice>}
       {payment && (
         <Card>
           <Badge>{payment.status}</Badge>
           <Heading>{money(payment.amountCents)}</Heading>
+          <InfoRow label="Tổng thanh toán" value={money(payment.amountCents)} />
           <Body>Nhà cung cấp: {payment.provider}</Body>
           <Body>Mã đặt vé: {payment.reservationId}</Body>
           <Body>Mã giao dịch: {payment.paymentRequestId}</Body>
@@ -180,6 +191,7 @@ export function AdminPayments() {
           )}
           {!!payment.failureReason && <Body>{payment.failureReason}</Body>}
           <ConfirmButton
+            danger={false}
             key={payment.paymentRequestId}
             title="Hoàn tiền toàn bộ"
             disabled={!eligible}
