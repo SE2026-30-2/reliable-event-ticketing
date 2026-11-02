@@ -1,6 +1,6 @@
 // Isolated, in-memory data for the development-only preview. No API or storage writes.
 export function createPreviewService() {
-  const event = { eventId: 'preview', name: 'The Dreams Concert 2026', venue: 'SVĐ Mỹ Đình, Hà Nội', description: 'Đêm nhạc bùng nổ với những bản hit đình đám, cùng dàn nghệ sĩ hàng đầu trong không gian âm thanh và ánh sáng đỉnh cao!', startsAt: '2026-12-25T08:00:00Z', endsAt: '2026-12-25T15:00:00Z', status: 'PUBLISHED', bannerUrl: '' };
+  const event = { eventId: 'preview', name: 'The Dreams Concert 2026', venue: 'SVĐ Mỹ Đình, Hà Nội', description: 'Đêm nhạc bùng nổ với những bản hit đình đám, cùng dàn nghệ sĩ hàng đầu trong không gian âm thanh và ánh sáng đỉnh cao!', startsAt: '2026-12-25T08:00:00Z', endsAt: '2026-12-25T15:00:00Z', status: 'PUBLISHED', bannerUrl: '', category: 'MUSIC', salesStartAt: '2026-11-01T00:00:00Z', salesEndAt: '2026-12-25T08:00:00Z' };
   const types = [
     { ticketTypeId: 'vip', name: 'VIP', priceCents: 50000000, quota: 1500, issuedCount: 1250, remaining: 250 },
     { ticketTypeId: 'a', name: 'Khu A', priceCents: 40000000, quota: 1500, issuedCount: 980, remaining: 520 },
@@ -13,6 +13,7 @@ export function createPreviewService() {
   const report = () => ({ eventId: event.eventId, name: event.name, generatedAt: new Date().toISOString(), ticketTypes: types.map((t) => ({ ...t, issued: t.issuedCount, reserved: 0, refunded: 0, voided: 0, guests: 0, checkedIn: Math.floor(t.issuedCount * .93), revenueCents: t.issuedCount * t.priceCents })), totals: { ticketsIssued: types.reduce((sum, t) => sum + t.issuedCount, 0), guestTickets: tickets.filter((t) => t.source === 'GUEST').length, checkedIn: 3210, noShow: 218, collectedCents: 128450000000, netRevenueCents: 128450000000, refundedCents: 0, couponDiscountCents: 450000000 } });
   const id = () => crypto.randomUUID();
   return {
+    analytics: (_id, days = 7) => copy({ views: 12840, timezone: 'Asia/Ho_Chi_Minh', daily: Array.from({ length: days }, (_, i) => ({ date: new Date(Date.now() - (days - 1 - i) * 86400000).toISOString().slice(0, 10), ticketsSold: 120 + i * 12, revenueCents: (120 + i * 12) * 40000000 })) }),
     workspace: () => copy({ event, report: report() }),
     update: (_id, body) => { Object.assign(event, body); return copy(event); },
     ticketTypes: () => copy(types),

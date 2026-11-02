@@ -13,6 +13,10 @@ public record UpdateEventRequest(
         @Size(max = 500) String bannerUrl,
         Instant startsAt,
         Instant endsAt,
-        EventStatus status
+        EventStatus status,
+        com.techie.microservices.ticketing.catalog.domain.model.EventCategory category,
+        Instant salesStartAt,
+        Instant salesEndAt,
+        boolean clearSalesSchedule
 ) {
 }

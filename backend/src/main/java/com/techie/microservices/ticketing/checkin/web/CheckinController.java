@@ -33,13 +33,14 @@ public class CheckinController {
     private static final String DEVICE_KEY_HEADER = "X-Device-Key";
 
     private final SubmitCheckinUseCase submitCheckinUseCase;
+    private final CheckinResponseMapper responseMapper;
 
     @PostMapping("/api/checkin")
     public CheckinResultResponse submitCheckin(@RequestHeader(value = DEVICE_KEY_HEADER, required = false) String deviceKey,
                                                 @Valid @RequestBody SubmitCheckinRequest request) {
         var record = submitCheckinUseCase.submitCheckin(
                 new SubmitCheckinCommand(deviceKey, request.qrPayload(), request.idempotencyKey(), request.clientCheckinAt()));
-        return CheckinResultResponse.from(record);
+        return responseMapper.response(record, deviceKey);
     }
 
     /** For the offline-queue flush: a device that was unreachable submits every attempt it
@@ -53,7 +54,7 @@ public class CheckinController {
                 .map(r -> new SubmitCheckinCommand(deviceKey, r.qrPayload(), r.idempotencyKey(), r.clientCheckinAt()))
                 .toList();
         return submitCheckinUseCase.submitCheckinBatch(commands).stream()
-                .map(CheckinResultResponse::from)
+                .map(record -> responseMapper.response(record, deviceKey))
                 .toList();
     }
 }

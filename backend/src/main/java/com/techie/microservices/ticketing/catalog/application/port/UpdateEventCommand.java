@@ -14,6 +14,14 @@ public record UpdateEventCommand(
         String bannerUrl,
         Instant startsAt,
         Instant endsAt,
-        EventStatus status
+        EventStatus status,
+        com.techie.microservices.ticketing.catalog.domain.model.EventCategory category,
+        Instant salesStartAt,
+        Instant salesEndAt,
+        boolean clearSalesSchedule
 ) {
+    public UpdateEventCommand(UUID eventId, String name, String venue, String description, String bannerUrl,
+                              Instant startsAt, Instant endsAt, EventStatus status) {
+        this(eventId, name, venue, description, bannerUrl, startsAt, endsAt, status, null, null, null, false);
+    }
 }

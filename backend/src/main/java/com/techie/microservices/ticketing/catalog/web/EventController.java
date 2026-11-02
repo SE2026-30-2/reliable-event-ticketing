@@ -48,7 +48,8 @@ public class EventController {
                                                      @AuthenticationPrincipal Jwt jwt) {
         var event = createEventUseCase.createEvent(new CreateEventCommand(
                 request.name(), request.venue(), request.startsAt(), request.endsAt(),
-                AuthenticatedUser.email(jwt), request.description(), request.bannerUrl(), request.status()));
+                AuthenticatedUser.email(jwt), request.description(), request.bannerUrl(), request.status(),
+                request.category(), request.salesStartAt(), request.salesEndAt()));
         return ResponseEntity.status(HttpStatus.CREATED).body(EventResponse.from(event));
     }
 
@@ -80,6 +81,7 @@ public class EventController {
         access.assertCanManage(eventId, jwt, authentication);
         return EventResponse.from(updateEventUseCase.updateEvent(new UpdateEventCommand(
                 eventId, request.name(), request.venue(), request.description(), request.bannerUrl(),
-                request.startsAt(), request.endsAt(), request.status())));
+                request.startsAt(), request.endsAt(), request.status(), request.category(),
+                request.salesStartAt(), request.salesEndAt(), request.clearSalesSchedule())));
     }
 }

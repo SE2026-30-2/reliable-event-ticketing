@@ -1,0 +1,7 @@
+.event-banner-drop { border: 1px dashed #b8afff; border-radius: 12px; padding: 16px; display: grid; gap: 10px; text-align: center; background: #f8f7ff; }
+.event-banner-drop.dragging { background: #ebe7ff; border-color: #6346ff; }
+.event-banner-drop img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; }
+.event-banner-drop button { padding: 10px; color: #5639df; border: 1px solid #d9d2ff; border-radius: 8px; background: white; cursor: pointer; }
+.event-banner-drop small { color: #6b7292; }
+.event-banner-drop input { width: 100%; font-size: 12px; }
+.event-banner-upload > p { color: #b92342; margin-top: 6px; font-size: 12px; }

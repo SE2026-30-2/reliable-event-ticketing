@@ -40,6 +40,18 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleStatus(org.springframework.web.server.ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+        return ResponseEntity.status(status).body(ErrorResponse.of(status, ex.getReason() == null ? status.getReasonPhrase() : ex.getReason()));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadSize(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of(HttpStatus.PAYLOAD_TOO_LARGE, "Ảnh bìa tối đa 5 MB."));
+    }
+
     @ExceptionHandler({WaitlistEntryNotFoundException.class, CouponNotFoundException.class, EventNotFoundException.class, TicketTypeNotFoundException.class, TicketNotFoundException.class,
             DeviceNotFoundException.class, ReservationNotFoundException.class})
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {

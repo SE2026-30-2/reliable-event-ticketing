@@ -1,6 +1,7 @@
 import axiosClient, { TICKETING_SERVICE_URL } from './axiosClient';
 
 export const eventService = {
+    recordView: (eventId) => axiosClient.post(`/api/event/${encodeURIComponent(eventId)}/views`, {}, { baseURL: TICKETING_SERVICE_URL, skipAuth: true }),
     /**
      * Lấy danh sách sự kiện
      * GET http://localhost:8091/api/event?q={keyword}&page={page}&size={size}

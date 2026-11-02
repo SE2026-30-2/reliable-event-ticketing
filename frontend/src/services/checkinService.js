@@ -19,10 +19,12 @@ function confirmed(scan, response) {
   const outcomes = ['ACCEPTED', 'DUPLICATE', 'INVALID_SIGNATURE', 'WRONG_EVENT', 'EXPIRED_WINDOW', 'TICKET_VOIDED', 'DEVICE_NOT_FOUND', 'DEVICE_REVOKED'];
   if (!response || !outcomes.includes(response.outcome) || !Number.isFinite(Date.parse(response.serverReceivedAt)) ||
       (response.outcome === 'ACCEPTED' && (!response.ticketId || !Number.isInteger(response.entryNo) || response.entryNo < 1)) ||
-      (scan.ticketId && response.ticketId && scan.ticketId !== response.ticketId)) {
+      (scan.ticketId && response.ticketId && scan.ticketId !== response.ticketId) ||
+      (response.idempotencyKey && response.idempotencyKey !== scan.idempotencyKey)) {
     throw new Error('Phản hồi soát vé không hợp lệ. Lượt quét vẫn được giữ để thử lại.');
   }
-  return { ...scan, ticketId: response.ticketId, outcome: response.outcome, detail: response.detail, entryNo: response.entryNo, serverReceivedAt: response.serverReceivedAt, pending: false, localOutcome: scan.outcome, qrPayload: undefined };
+  return { ...scan, ticketId: response.ticketId, outcome: response.outcome, detail: response.detail, entryNo: response.entryNo, serverReceivedAt: response.serverReceivedAt, pending: false, localOutcome: scan.outcome, qrPayload: undefined,
+    eventName: response.eventName, holderName: response.holderName, ticketTypeName: response.ticketTypeName, firstCheckinAt: response.firstCheckinAt };
 }
 export async function refreshCertificate() {
   const jwks = await request('/.well-known/jwks.json');

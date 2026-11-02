@@ -9,14 +9,14 @@ async function ticket(overrides = {}) {
   const signature = await webcrypto.subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, new TextEncoder().encode(payload));
   return `test-key.${payload}.${Buffer.from(signature).toString('base64url')}`;
 }
-async function setup(page, context, outcome = 'ACCEPTED') {
+async function setup(page, context, outcome = 'ACCEPTED', metadata = {}) {
   const submissions = [];
   await context.route('http://localhost:8091/**', async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path === '/.well-known/jwks.json') return route.fulfill({ json: jwks });
     if (path.startsWith('/api/checkin')) {
       const body = request.postDataJSON(); submissions.push({ path, body, key: request.headers()['x-device-key'] });
-      const answer = (b) => ({ ticketId: (() => { try { return JSON.parse(Buffer.from(b.qrPayload.split('.')[1], 'base64url')).tid; } catch { return null; } })(), outcome, serverReceivedAt: new Date().toISOString(), entryNo: outcome === 'ACCEPTED' ? 1 : null });
+      const answer = (b) => ({ ticketId: (() => { try { return JSON.parse(Buffer.from(b.qrPayload.split('.')[1], 'base64url')).tid; } catch { return null; } })(), outcome, serverReceivedAt: new Date().toISOString(), entryNo: outcome === 'ACCEPTED' ? 1 : null, idempotencyKey: b.idempotencyKey, ...metadata });
       return route.fulfill({ json: Array.isArray(body) ? body.map(answer) : answer(body) });
     }
     return route.fulfill({ status: 404, body: '' });
@@ -45,6 +45,24 @@ test('online manual scan, device header, history, and responsive layout', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'tmp/screen13-mobile.png', fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('server-confirmed holder and event metadata appears in feedback and scan history', async ({ page, context }) => {
+  await setup(page, context, 'ACCEPTED', { holderName: 'Nguyễn Minh Anh', eventName: 'Đêm nhạc', ticketTypeName: 'VIP' });
+  await scan(page, await ticket());
+  await expect(page.getByRole('heading', { name: 'CHO VÀO', exact: true })).toBeVisible();
+  await expect(page.getByText('Nguyễn Minh Anh', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('Đêm nhạc', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button').filter({ hasText: 'Nguyễn Minh Anh' })).toBeVisible();
+});
+
+test('a response for another scan cannot confirm entry or remove its pending attempt', async ({ page, context }) => {
+  await setup(page, context, 'ACCEPTED', { idempotencyKey: crypto.randomUUID() });
+  await scan(page, await ticket());
+  await expect(page.getByText('1 lượt chờ đồng bộ')).toBeVisible();
+  await expect(page.getByText('Máy chủ đã xác nhận', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Chưa xác nhận được lượt quét/)).toBeVisible();
 });
 test('offline verification persists before sending, survives reload and reconciles through batch', async ({ page, context }) => {
   const requests = await setup(page, context, 'TICKET_VOIDED');
