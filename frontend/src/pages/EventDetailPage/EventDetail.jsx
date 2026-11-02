@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
@@ -10,6 +10,7 @@ export default function EventDetail({ currentUser: propUser }) {
     const currentUser = propUser || authUser;
     const { eventId } = useParams();
     const navigate = useNavigate();
+    const viewed = useRef(null);
 
     // Event & Ticket Types Data States
     const [event, setEvent] = useState(null);
@@ -53,6 +54,10 @@ export default function EventDetail({ currentUser: propUser }) {
                     eventService.getTicketTypesByEventId(eventId)
                 ]);
                 setEvent(eventData);
+                if (eventData.status === 'PUBLISHED' && viewed.current !== eventId) {
+                    viewed.current = eventId;
+                    void eventService.recordView(eventId).catch(() => {});
+                }
 
                 const list = ticketsData || [];
                 setTicketTypes(list);

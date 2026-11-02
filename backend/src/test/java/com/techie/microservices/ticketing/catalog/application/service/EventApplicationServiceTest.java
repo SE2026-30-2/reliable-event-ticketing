@@ -98,4 +98,46 @@ class EventApplicationServiceTest {
         service.listManageableEvents(new Actor("root@x.com", true, false));
         verify(events).findAll();
     }
+
+    @Test
+    void salesWindowControlsActualAvailabilityIncludingBoundaries() {
+        when(events.save(any(Event.class))).thenAnswer(inv -> inv.getArgument(0));
+        Event event = service.createEvent(new CreateEventCommand("Gig", "Hall", start, end, "o@x.com", "d", null,
+                EventStatus.PUBLISHED, com.techie.microservices.ticketing.catalog.domain.model.EventCategory.MUSIC,
+                start.minusSeconds(600), start));
+        assertThat(event.getCategory()).isEqualTo(com.techie.microservices.ticketing.catalog.domain.model.EventCategory.MUSIC);
+        assertThat(event.isOpenForSales(start.minusSeconds(601))).isFalse();
+        assertThat(event.isOpenForSales(start.minusSeconds(600))).isTrue();
+        assertThat(event.isOpenForSales(start.minusSeconds(1))).isTrue();
+        assertThat(event.isOpenForSales(start)).isFalse();
+    }
+
+    @Test
+    void rejectsPartialOrBackwardsSalesWindowsAndClosingAfterEvent() {
+        for (Instant close : new Instant[]{null, start.minusSeconds(700), end.plusSeconds(1)}) {
+            assertThatThrownBy(() -> service.createEvent(new CreateEventCommand("Gig", "Hall", start, end, null, null, null,
+                    EventStatus.DRAFT, null, start.minusSeconds(600), close)))
+                    .isInstanceOf(InvalidEventChangeException.class);
+        }
+    }
+
+    @Test
+    void partialUpdatesPreserveScheduleAndExplicitClearRestoresDefaultSales() {
+        Event event = existing(EventStatus.PUBLISHED);
+        event.setSalesStartAt(start.minusSeconds(600)); event.setSalesEndAt(start);
+        service.updateEvent(new UpdateEventCommand(event.getEventId(), "New name", null, null, null, null, null, null));
+        assertThat(event.getSalesEndAt()).isEqualTo(start);
+        service.updateEvent(new UpdateEventCommand(event.getEventId(), null, null, null, null, null, null, null, null, null, null, true));
+        assertThat(event.getSalesStartAt()).isNull();
+        assertThat(event.isOpenForSales(start)).isTrue();
+    }
+
+    @Test
+    void cannotEditFinalStateEvenWithoutChangingStatus() {
+        for (EventStatus status : List.of(EventStatus.COMPLETED, EventStatus.CANCELLED)) {
+            Event event = existing(status);
+            assertThatThrownBy(() -> service.updateEvent(new UpdateEventCommand(event.getEventId(), "Renamed", null, null, null, null, null, null)))
+                    .isInstanceOf(InvalidEventChangeException.class);
+        }
+    }
 }

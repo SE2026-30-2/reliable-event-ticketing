@@ -17,10 +17,18 @@ export function managementError(error) {
   if (status === 403) return 'Bạn cần quyền Ban tổ chức hoặc Quản trị viên để quản lý sự kiện.'
   if (status === 404) return 'Sự kiện không tồn tại hoặc không thuộc quyền quản lý của bạn.'
   if (status === 429) return 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.'
+  if (status === 413) return 'Ảnh bìa tối đa 5 MB. Vui lòng chọn ảnh nhỏ hơn.'
   return error.response?.data?.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.'
 }
 
 export const manageEventService = {
+  uploadBanner: async (file) => {
+    const body = new FormData(); body.append('file', file);
+    const { data } = await client.post('/api/manage/event-images', body);
+    if (!/^\/api\/event-images\/[0-9a-f-]{36}$/i.test(data?.url)) throw new Error('Máy chủ chưa trả đường dẫn ảnh hợp lệ.');
+    return `${client.defaults.baseURL.replace(/\/$/, '')}${data.url}`;
+  },
+  analytics: (id, days, signal) => client.get(`/api/manage/events/${encodeURIComponent(id)}/analytics`, { params: { days, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }, signal }).then(({ data }) => data),
   list: (signal) => client.get('/api/manage/events', { signal }).then(({ data }) => data),
   create: (body) => client.post('/api/event', body).then(({ data }) => data),
   update: (id, body) => client.patch(`/api/event/${encodeURIComponent(id)}`, body).then(({ data }) => data),

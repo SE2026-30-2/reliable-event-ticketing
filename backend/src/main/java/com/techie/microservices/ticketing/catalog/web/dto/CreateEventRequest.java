@@ -16,6 +16,9 @@ public record CreateEventRequest(
         @Size(max = 5000) String description,
         @Size(max = 500) String bannerUrl,
         /** DRAFT (hidden until published) or PUBLISHED; omitted = PUBLISHED. */
-        EventStatus status
+        EventStatus status,
+        com.techie.microservices.ticketing.catalog.domain.model.EventCategory category,
+        Instant salesStartAt,
+        Instant salesEndAt
 ) {
 }

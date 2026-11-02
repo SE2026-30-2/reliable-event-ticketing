@@ -14,7 +14,11 @@ public record EventResponse(
         Instant endsAt,
         String status,
         String description,
-        String bannerUrl
+        String bannerUrl,
+        com.techie.microservices.ticketing.catalog.domain.model.EventCategory category,
+        Instant salesStartAt,
+        Instant salesEndAt,
+        Instant createdAt
 ) {
     public static EventResponse from(Event event) {
         return new EventResponse(
@@ -25,6 +29,6 @@ public record EventResponse(
                 event.getEndsAt(),
                 event.getStatus().name(),
                 event.getDescription(),
-                event.getBannerUrl());
+                event.getBannerUrl(), event.getCategory(), event.getSalesStartAt(), event.getSalesEndAt(), event.getCreatedAt());
     }
 }

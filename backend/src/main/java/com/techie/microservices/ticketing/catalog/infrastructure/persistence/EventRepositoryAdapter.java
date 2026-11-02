@@ -3,6 +3,7 @@ package com.techie.microservices.ticketing.catalog.infrastructure.persistence;
 import com.techie.microservices.ticketing.catalog.application.port.EventRepositoryPort;
 import com.techie.microservices.ticketing.catalog.domain.model.Event;
 import com.techie.microservices.ticketing.catalog.domain.model.EventStatus;
+import com.techie.microservices.ticketing.catalog.domain.model.EventCategory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -58,6 +59,8 @@ public class EventRepositoryAdapter implements EventRepositoryPort {
                 .organizerId(event.getOrganizerId())
                 .description(event.getDescription())
                 .bannerUrl(event.getBannerUrl())
+                .category(event.getCategory() == null ? null : event.getCategory().name())
+                .salesStartAt(event.getSalesStartAt()).salesEndAt(event.getSalesEndAt())
                 .build();
     }
 
@@ -74,6 +77,8 @@ public class EventRepositoryAdapter implements EventRepositoryPort {
                 .organizerId(entity.getOrganizerId())
                 .description(entity.getDescription())
                 .bannerUrl(entity.getBannerUrl())
+                .category(entity.getCategory() == null ? null : EventCategory.valueOf(entity.getCategory()))
+                .salesStartAt(entity.getSalesStartAt()).salesEndAt(entity.getSalesEndAt())
                 .build();
     }
 }

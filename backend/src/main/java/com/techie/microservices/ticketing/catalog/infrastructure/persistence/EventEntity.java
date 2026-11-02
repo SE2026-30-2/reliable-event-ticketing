@@ -55,4 +55,9 @@ public class EventEntity {
 
     @Column(name = "banner_url")
     private String bannerUrl;
+    private String category;
+    @Column(name = "sales_start_at")
+    private Instant salesStartAt;
+    @Column(name = "sales_end_at")
+    private Instant salesEndAt;
 }

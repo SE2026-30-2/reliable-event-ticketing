@@ -27,8 +27,13 @@ public class Event {
     private String organizerId;
     private String description;
     private String bannerUrl;
+    private EventCategory category;
+    private Instant salesStartAt;
+    private Instant salesEndAt;
 
     public boolean isOpenForSales(Instant now) {
-        return status == EventStatus.PUBLISHED && endsAt.isAfter(now);
+        return status == EventStatus.PUBLISHED && endsAt.isAfter(now)
+                && (salesStartAt == null || !now.isBefore(salesStartAt))
+                && (salesEndAt == null || now.isBefore(salesEndAt));
     }
 }

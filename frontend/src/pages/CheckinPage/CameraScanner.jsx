@@ -26,8 +26,11 @@ export default function CameraScanner({ onScan, disabled }) {
             const element = video.current;
             if (element?.readyState >= 2) {
               let value;
-              if (detector) value = (await detector.detect(element))[0]?.rawValue;
-              else {
+              if (detector) {
+                try { value = (await detector.detect(element))[0]?.rawValue; }
+                catch { detector = null; }
+              }
+              if (!detector) {
                 canvas.width = Math.min(800, element.videoWidth);
                 canvas.height = Math.round(canvas.width * element.videoHeight / element.videoWidth);
                 context.drawImage(element, 0, 0, canvas.width, canvas.height);
@@ -63,7 +66,7 @@ export default function CameraScanner({ onScan, disabled }) {
   async function toggleTorch() {
     try {
       const track = stream.current?.getVideoTracks()[0];
-      if (!track?.getCapabilities().torch) throw new Error('Camera này không hỗ trợ đèn pin.');
+      if (!track?.getCapabilities?.().torch) throw new Error('Camera này không hỗ trợ đèn pin.');
       await track.applyConstraints({ advanced: [{ torch: !torch }] }); setTorch(!torch);
     } catch (e) { setError(e.message); }
   }

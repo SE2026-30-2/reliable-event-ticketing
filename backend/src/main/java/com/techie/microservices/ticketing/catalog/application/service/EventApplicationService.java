@@ -49,7 +49,9 @@ public class EventApplicationService implements CreateEventUseCase, GetEventUseC
                 .organizerId(command.organizerId() == null ? null : command.organizerId().trim().toLowerCase())
                 .description(command.description())
                 .bannerUrl(command.bannerUrl())
+                .category(command.category()).salesStartAt(command.salesStartAt()).salesEndAt(command.salesEndAt())
                 .build();
+        validateSalesSchedule(event);
         return eventRepositoryPort.save(event);
     }
 
@@ -57,6 +59,19 @@ public class EventApplicationService implements CreateEventUseCase, GetEventUseC
     public Event updateEvent(UpdateEventCommand command) {
         Event event = eventRepositoryPort.findByEventId(command.eventId())
                 .orElseThrow(() -> new EventNotFoundException(command.eventId()));
+        if (event.getStatus() == EventStatus.CANCELLED || event.getStatus() == EventStatus.COMPLETED) {
+            throw new InvalidEventChangeException("Cannot edit a cancelled or completed event");
+        }
+        if (command.category() != null) event.setCategory(command.category());
+        if (command.clearSalesSchedule()) {
+            if (command.salesStartAt() != null || command.salesEndAt() != null) {
+                throw new InvalidEventChangeException("Cannot clear and set the sales schedule together");
+            }
+            event.setSalesStartAt(null); event.setSalesEndAt(null);
+        } else {
+            if (command.salesStartAt() != null) event.setSalesStartAt(command.salesStartAt());
+            if (command.salesEndAt() != null) event.setSalesEndAt(command.salesEndAt());
+        }
         if (command.name() != null) {
             if (command.name().isBlank()) {
                 throw new InvalidEventChangeException("name must not be blank");
@@ -74,7 +89,16 @@ public class EventApplicationService implements CreateEventUseCase, GetEventUseC
         if (command.status() != null && command.status() != event.getStatus()) {
             event.setStatus(checkedTransition(event.getStatus(), command.status()));
         }
+        validateSalesSchedule(event);
         return eventRepositoryPort.save(event);
+    }
+
+    private static void validateSalesSchedule(Event event) {
+        Instant from = event.getSalesStartAt(), until = event.getSalesEndAt();
+        if ((from == null) != (until == null) || (from != null &&
+                (!until.isAfter(from) || until.isAfter(event.getEndsAt())))) {
+            throw new InvalidEventChangeException("Sales require both dates; closing must follow opening and be no later than event end");
+        }
     }
 
     /** DRAFT -> PUBLISHED | CANCELLED, PUBLISHED -> CANCELLED. Nothing goes back to DRAFT once public

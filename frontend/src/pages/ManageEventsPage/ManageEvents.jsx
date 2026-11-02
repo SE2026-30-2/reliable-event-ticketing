@@ -4,8 +4,11 @@ import Header from '../../components/layout/Header'
 import Footer from '../../components/layout/Footer'
 import { manageEventService, managementError } from '../../services/manageEventService'
 import './manage-events.css'
+import BannerUpload from '../../components/events/BannerUpload'
+import { categories, salesSchedule, searchText } from '../../components/events/eventFields'
+import '../../components/events/event-fields.css'
 
-const emptyForm = { name: '', venue: '', description: '', startsAt: '', endsAt: '', bannerUrl: '' }
+const emptyForm = { name: '', venue: '', description: '', startsAt: '', endsAt: '', bannerUrl: '', category: '', salesStartAt: '', salesEndAt: '' }
 const tabs = [['ALL', 'Tất cả'], ['DRAFT', 'Đang nháp'], ['PUBLISHED', 'Đã xuất bản'], ['CANCELLED', 'Đã hủy'], ['COMPLETED', 'Đã kết thúc']]
 const number = new Intl.NumberFormat('vi-VN')
 const previewEvents = [
@@ -48,7 +51,7 @@ export default function ManageEvents({ preview = false }) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
-  const [imageFailed, setImageFailed] = useState(false)
+  const [bannerFile, setBannerFile] = useState(null)
   const nameInput = useRef(null)
   const formRef = useRef(null)
   const searchInput = useRef(null)
@@ -86,13 +89,13 @@ export default function ManageEvents({ preview = false }) {
     else cancelDialog.current?.close()
   }, [cancelTarget])
 
-  const visibleEvents = events.filter((event) => (tab === 'ALL' || event.status === tab) && `${event.name} ${event.venue || ''}`.toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi')))
-  if (sort !== 'default') visibleEvents.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'vi') : new Date(a.startsAt) - new Date(b.startsAt))
+  const visibleEvents = events.filter((event) => (tab === 'ALL' || event.status === tab) && searchText(`${event.name} ${event.venue || ''}`).includes(searchText(query.trim())))
+  if (sort !== 'default') visibleEvents.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'vi') : sort === 'newest' ? new Date(b.createdAt || 0) - new Date(a.createdAt || 0) : new Date(a.startsAt) - new Date(b.startsAt))
 
   function openForm(event = null) {
     setEditing(event)
-    setForm(event ? { name: event.name, venue: event.venue || '', description: event.description || '', bannerUrl: event.bannerUrl || '', startsAt: localDate(event.startsAt), endsAt: localDate(event.endsAt) } : emptyForm)
-    setImageFailed(false)
+    setForm(event ? { name: event.name, venue: event.venue || '', description: event.description || '', bannerUrl: event.bannerUrl || '', startsAt: localDate(event.startsAt), endsAt: localDate(event.endsAt), category: event.category || '', salesStartAt: localDate(event.salesStartAt), salesEndAt: localDate(event.salesEndAt) } : emptyForm)
+    setBannerFile(null)
     setNotice(null)
     nameInput.current?.focus()
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -100,7 +103,7 @@ export default function ManageEvents({ preview = false }) {
 
   function updateField(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
-    if (event.target.name === 'bannerUrl') setImageFailed(false)
+    if (event.target.name === 'bannerUrl') setBannerFile(null)
   }
 
   function replaceEvent(saved) {
@@ -120,19 +123,25 @@ export default function ManageEvents({ preview = false }) {
     if (!editing && new Date(form.startsAt) <= new Date()) {
       setNotice({ error: true, text: 'Thời gian bắt đầu sự kiện mới phải ở tương lai.' }); return
     }
-    if (form.bannerUrl && !/^https?:\/\//i.test(form.bannerUrl)) {
+    if (!bannerFile && form.bannerUrl && !/^https?:\/\//i.test(form.bannerUrl)) {
       setNotice({ error: true, text: 'Đường dẫn ảnh phải bắt đầu bằng http:// hoặc https://.' }); return
     }
-    const body = { ...form, name: form.name.trim(), venue: form.venue.trim(), startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() }
+    let schedule
+    try { schedule = salesSchedule(form, form.endsAt) }
+    catch (error) { setNotice({ error: true, text: error.message }); return }
+    const body = { ...form, ...schedule, category: form.category || null, name: form.name.trim(), venue: form.venue.trim(), startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() }
+    if (!body.salesStartAt) { delete body.salesStartAt; delete body.salesEndAt; if (editing) body.clearSalesSchedule = true }
     if (!editing || editing.status !== status) body.status = status
     mutationLock.current = true
     setBusy(true)
     setNotice(null)
     try {
+      if (bannerFile && !preview) body.bannerUrl = await manageEventService.uploadBanner(bannerFile)
       const saved = preview ? { ...editing, ...body, status, eventId: editing?.eventId || `preview-${Date.now()}` } : editing ? await manageEventService.update(editing.eventId, body) : await manageEventService.create(body)
       replaceEvent(saved)
       setEditing(null)
       setForm(emptyForm)
+      setBannerFile(null)
       setTab('ALL')
       setQuery('')
       setNotice({ text: `${preview ? 'Bản xem thử: ' : ''}${status === 'PUBLISHED' ? 'Đã lưu sự kiện đã xuất bản.' : 'Đã lưu bản nháp.'}` })
@@ -162,7 +171,7 @@ export default function ManageEvents({ preview = false }) {
         <div className="manage-intro"><p className="manage-eyebrow">QUẢN LÝ • TẠO MỚI • CHỈNH SỬA • THEO DÕI</p><h1 id="manage-title">Quản lý sự kiện</h1><div className="manage-intro-bottom"><p>Tạo, chỉnh sửa và theo dõi toàn bộ sự kiện của bạn.<br />Dễ dàng quản lý vé, doanh thu và người tham gia.</p><button type="button" className="manage-button primary" disabled={busy || !canEdit} onClick={() => openForm()}><Icon name="plus" />Tạo sự kiện mới</button></div></div>
         <div className="manage-list-panel">
           <div className="manage-tabs" aria-label="Lọc trạng thái">{tabs.map(([key, label]) => <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label} ({key === 'ALL' ? events.length : events.filter((event) => event.status === key).length})</button>)}</div>
-          <div className="manage-toolbar"><label className="manage-search"><Icon name="search" /><input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm kiếm sự kiện theo tên, địa điểm..." aria-label="Tìm kiếm theo tên hoặc địa điểm" /></label><select aria-label="Sắp xếp sự kiện" value={sort} onChange={(event) => setSort(event.target.value)}><option value="default">Sắp xếp: Mặc định</option><option value="date">Ngày diễn ra: Gần nhất</option><option value="name">Tên: A – Z</option></select></div>
+          <div className="manage-toolbar"><label className="manage-search"><Icon name="search" /><input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm kiếm sự kiện theo tên, địa điểm..." aria-label="Tìm kiếm theo tên hoặc địa điểm" /></label><select aria-label="Sắp xếp sự kiện" value={sort} onChange={(event) => setSort(event.target.value)}><option value="default">Sắp xếp: Mặc định</option><option value="newest">Mới nhất</option><option value="date">Ngày diễn ra: Gần nhất</option><option value="name">Tên: A – Z</option></select></div>
           {loading ? <div className="manage-empty" role="status">Đang tải sự kiện…</div> : loadError ? <div className="manage-empty" role="alert"><p>{loadError}</p><button className="manage-button secondary" type="button" onClick={() => { setLoading(true); setRefresh((value) => value + 1) }}>Thử lại</button><Link to="/login">Đăng nhập lại</Link></div> : !visibleEvents.length ? <div className="manage-empty"><Icon name="ticket" /><h2>{events.length ? 'Không tìm thấy sự kiện' : 'Sự kiện đầu tiên của bạn'}</h2><p>{events.length ? 'Thử tìm kiếm khác hoặc chọn trạng thái khác.' : 'Điền thông tin bên cạnh để bắt đầu tạo sự kiện.'}</p></div> : <ul className="manage-events">{visibleEvents.map((event, index) => {
             const count = preview ? event : stats[event.eventId]
             return <li key={event.eventId} className={editing?.eventId === event.eventId ? 'selected' : ''}>
@@ -178,12 +187,12 @@ export default function ManageEvents({ preview = false }) {
         {notice && <div className={`manage-notice ${notice.error ? 'error' : ''}`} role={notice.error ? 'alert' : 'status'}>{notice.text}</div>}
         <form onSubmit={submit}><fieldset disabled={busy || !canEdit}>
           <label className="manage-field">Tên sự kiện <b>*</b><input ref={nameInput} name="name" value={form.name} onChange={updateField} placeholder="Nhập tên sự kiện..." required maxLength={255} /></label>
-          <label className="manage-field">Danh mục<select disabled aria-describedby="category-help"><option>♫ Chọn danh mục</option></select><small id="category-help">Danh mục sẽ được hỗ trợ sau.</small></label>
+          <label className="manage-field">Danh mục <b>*</b><select name="category" value={form.category} onChange={updateField} required={!editing}><option value="" disabled={Boolean(editing?.category)}>Chọn danh mục</option>{categories.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
           <label className="manage-field">Mô tả sự kiện <b>*</b><textarea name="description" value={form.description} onChange={updateField} placeholder="Giới thiệu về sự kiện của bạn..." maxLength={5000} required rows={3} /><span className="manage-counter">{form.description.length}/5000</span></label>
           <label className="manage-field">Địa điểm <b>*</b><input name="venue" value={form.venue} onChange={updateField} placeholder="Nhập địa điểm tổ chức..." maxLength={255} required /></label>
           <div className="manage-field">Thời gian diễn ra <b>*</b><div className="manage-date-range"><label>Từ ngày<input aria-label="Ngày giờ bắt đầu" type="datetime-local" name="startsAt" value={form.startsAt} onChange={updateField} required /></label><span aria-hidden="true">→</span><label>Đến ngày<input aria-label="Ngày giờ kết thúc" type="datetime-local" name="endsAt" value={form.endsAt} min={form.startsAt} onChange={updateField} required /></label></div><small>Theo múi giờ thiết bị: {Intl.DateTimeFormat().resolvedOptions().timeZone}</small></div>
-          <div className="manage-field">Thời gian mở bán vé<div className="manage-date-range unavailable"><span>▣ Từ ngày</span><span>→</span><span>Đến ngày</span></div><small>Lịch mở bán riêng sẽ được hỗ trợ sau.</small></div>
-          <label className="manage-field">Ảnh bìa sự kiện<input name="bannerUrl" type="url" value={form.bannerUrl} onChange={updateField} placeholder="Dán đường dẫn ảnh https://..." maxLength={500} /><span className="manage-cover">{form.bannerUrl && /^https?:\/\//i.test(form.bannerUrl) && !imageFailed ? <img src={form.bannerUrl} alt="Xem trước ảnh bìa sự kiện" onError={() => setImageFailed(true)} /> : <><Icon name="image" /><span>{imageFailed ? 'Không tải được ảnh. Kiểm tra đường dẫn.' : 'Xem trước ảnh bìa sự kiện'}</span><small>Sử dụng đường dẫn ảnh JPG, PNG</small></>}</span></label>
+          <div className="manage-field">Thời gian mở bán vé<div className="manage-date-range"><label>Mở bán<input aria-label="Ngày giờ mở bán" type="datetime-local" name="salesStartAt" value={form.salesStartAt} onChange={updateField} required={Boolean(form.salesEndAt)} /></label><span>→</span><label>Đóng bán<input aria-label="Ngày giờ đóng bán" type="datetime-local" name="salesEndAt" value={form.salesEndAt} min={form.salesStartAt} max={form.endsAt} onChange={updateField} required={Boolean(form.salesStartAt)} /></label></div><small>Để trống cả hai để bán ngay khi xuất bản đến lúc sự kiện kết thúc.</small></div>
+          <div className="manage-field"><label>Đường dẫn ảnh bìa<input name="bannerUrl" type="url" value={bannerFile ? '' : form.bannerUrl} onChange={updateField} placeholder="Dán đường dẫn ảnh https://..." maxLength={500} /></label><BannerUpload value={form.bannerUrl} onChange={(bannerUrl) => setForm((current) => ({ ...current, bannerUrl }))} onFile={setBannerFile} disabled={busy || !canEdit} /></div>
           <div className="manage-form-actions">{!editing || editing.status === 'DRAFT' ? <><button className="manage-button secondary" type="submit" value="DRAFT">{busy ? 'Đang lưu…' : 'Lưu nháp'}</button><button className="manage-button primary" type="submit" value="PUBLISHED"><Icon name="send" />{busy ? 'Đang lưu…' : 'Xuất bản'}</button></> : <button className="manage-button primary" type="submit" value={editing.status}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button>}</div>
           {editing && <button className="manage-reset" type="button" onClick={() => openForm()}>Bỏ chỉnh sửa</button>}
         </fieldset></form>

@@ -18,6 +18,7 @@ async function setup(page, options = {}) {
         data.eventId = 'e1';
         if (options.status) data.status = options.status;
       } else if (url.pathname.endsWith('/report')) data = (await api.workspace()).report;
+      else if (url.pathname.endsWith('/analytics')) data = await api.analytics('e1', Number(url.searchParams.get('days')));
       else if (url.pathname.endsWith('/ticket-types')) data = method === 'POST' ? await api.createTicketType('e1', body) : await api.ticketTypes();
       else if (url.pathname.endsWith('/coupons')) data = method === 'POST' ? await api.createCoupon('e1', body) : await api.coupons();
       else if (url.pathname.includes('/coupons/')) data = await api.setCouponActive('e1', url.pathname.split('/').at(-1), body.active);
@@ -72,6 +73,25 @@ test('edit validates time range and persists confirmed response', async ({ page 
   const patch = requests.find((r) => r.method === 'PATCH');
   expect(patch.body.status).toBeUndefined();
   expect(patch.body.endsAt).toMatch(/Z$/);
+});
+
+test('overview displays daily analytics, period selection and persists category and sale dates', async ({ page }) => {
+  const requests = await setup(page);
+  await expect(page.getByText('12.840', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Biểu đồ doanh thu và số vé mua theo ngày', exact: true })).toBeVisible();
+  await page.getByLabel('Khoảng thời gian báo cáo').selectOption('30');
+  await expect(page.getByLabel('Khoảng thời gian báo cáo')).toHaveValue('30');
+  await page.getByText('Xem số liệu theo ngày', { exact: true }).click();
+  await expect(page.getByRole('columnheader', { name: 'Ngày', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox', { name: 'Danh mục', exact: true }).selectOption('SPORTS');
+  await dialog.getByLabel('Ngày giờ mở bán', { exact: true }).fill('2026-11-01T08:00');
+  await dialog.getByLabel('Ngày giờ đóng bán', { exact: true }).fill('2026-12-24T18:00');
+  await dialog.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(page.getByText('Đã lưu thông tin sự kiện.', { exact: true })).toBeVisible();
+  expect(requests.find((r) => r.method === 'PATCH').body).toMatchObject({ category: 'SPORTS', clearSalesSchedule: false });
+  await expect(page.getByText('Thể thao', { exact: true }).first()).toBeVisible();
 });
 
 test('cancel requires confirmation and disables further editing', async ({ page }) => {
