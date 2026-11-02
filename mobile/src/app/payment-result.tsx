@@ -9,9 +9,12 @@ import {
   Loading,
   Screen,
   Title,
+  InfoRow,
+  Notice,
 } from "@/components/ui-kit";
 import { useResource } from "@/hooks/use-resource";
 import { syncPayment } from "@/lib/payment";
+import { AuthArtwork } from "@/components/auth-artwork";
 import { money } from "@/lib/types";
 function ResultContent() {
   const { vnp_TxnRef, txnRef } = useLocalSearchParams<{
@@ -33,28 +36,53 @@ function ResultContent() {
       {resource.loading && <Loading />}
       <Feedback message={resource.error} retry={resource.reload} />
       {resource.data && (
-        <Card>
-          <Title>
-            {resource.data.status === "COMPLETED"
-              ? "Thanh toán thành công"
-              : resource.data.status === "PENDING"
-                ? "Đang chờ xác nhận"
-                : resource.data.status}
-          </Title>
-          <Body>{money(resource.data.amountCents)}</Body>
-          {!!resource.data.failureReason && (
-            <Body>{resource.data.failureReason}</Body>
-          )}
-          <Button
-            title="Xem chi tiết giao dịch"
-            onPress={() =>
-              router.replace({
-                pathname: "/checkout/[id]",
-                params: { id: resource.data!.reservationId },
-              })
+        <>
+          <AuthArtwork
+            kind={
+              resource.data.status === "COMPLETED"
+                ? "success"
+                : ["FAILED", "EXPIRED"].includes(resource.data.status)
+                  ? "failure"
+                  : "pending"
             }
           />
-        </Card>
+          <Card>
+            <Title>
+              {resource.data.status === "COMPLETED"
+                ? "Thanh toán thành công"
+                : resource.data.status === "PENDING"
+                  ? "Đang chờ xác nhận"
+                  : resource.data.status}
+            </Title>
+            <Body>{money(resource.data.amountCents)}</Body>
+            <InfoRow
+              label="Mã giao dịch"
+              value={resource.data.paymentRequestId}
+            />
+            <InfoRow
+              label="Phương thức thanh toán"
+              value={resource.data.provider}
+            />
+            {resource.data.status === "COMPLETED" && (
+              <Notice success>
+                Vé của bạn đã được xác nhận. Mở Vé của tôi để xem vé đã phát
+                hành.
+              </Notice>
+            )}
+            {!!resource.data.failureReason && (
+              <Body>{resource.data.failureReason}</Body>
+            )}
+            <Button
+              title="Xem chi tiết giao dịch"
+              onPress={() =>
+                router.replace({
+                  pathname: "/checkout/[id]",
+                  params: { id: resource.data!.reservationId },
+                })
+              }
+            />
+          </Card>
+        </>
       )}
       <Button
         secondary

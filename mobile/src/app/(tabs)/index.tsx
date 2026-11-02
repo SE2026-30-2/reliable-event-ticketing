@@ -39,18 +39,10 @@ export default function Discover() {
   return (
     <Screen>
       <Card
-        style={{
-          backgroundColor: "#eef2ff",
-          borderColor: "#e0e7ff",
-          paddingVertical: 28,
-        }}
+        style={{ borderWidth: 0, padding: 0, backgroundColor: "transparent" }}
       >
-        <Badge>KHÁM PHÁ · TRẢI NGHIỆM · KẾT NỐI</Badge>
-        <Title>Những sự kiện tuyệt vời đang chờ bạn!</Title>
-        <Body muted>
-          Từ âm nhạc, thể thao đến hội thảo. Đừng bỏ lỡ những khoảnh khắc đáng
-          nhớ.
-        </Body>
+        <Title>Khám phá sự kiện hấp dẫn</Title>
+        <Body muted>Concert, thể thao, hội thảo, điện ảnh và hơn thế nữa</Body>
         <Field
           label="Tìm kiếm sự kiện"
           placeholder="Tên sự kiện hoặc địa điểm"
@@ -64,13 +56,14 @@ export default function Discover() {
         />
         <Button
           title="Tìm kiếm →"
+          compact
           onPress={() => {
             setQuery(input.trim());
             setPage(0);
           }}
         />
       </Card>
-      <Title>{query ? `Kết quả: ${query}` : "Khám phá sự kiện"}</Title>
+      <Badge>{query ? `Kết quả: ${query}` : "Tất cả sự kiện"}</Badge>
       <Feedback message={resource.error} retry={resource.reload} />
       {resource.loading ? (
         <Loading />

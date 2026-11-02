@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Text } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Body, Button, Card, Feedback, Heading, styles } from "./ui-kit";
+import { Body, Button, Feedback, Notice, styles } from "./ui-kit";
+import { BottomSheet } from "./bottom-sheet";
 import { messageOf } from "@/lib/types";
 
 export function DeviceKey({
@@ -14,8 +15,7 @@ export function DeviceKey({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   return (
-    <Card>
-      <Heading>Khóa thiết bị mới</Heading>
+    <BottomSheet title="Khóa thiết bị mới" close={onClose}>
       <Body>Khóa chỉ hiển thị lần này. Sao chép và lưu trước khi đóng.</Body>
       <Text
         selectable
@@ -25,7 +25,7 @@ export function DeviceKey({
         {value}
       </Text>
       <Feedback message={error} />
-      {!!notice && <Body>{notice}</Body>}
+      {!!notice && <Notice success>{notice}</Notice>}
       <Button
         title="Sao chép khóa thiết bị"
         onPress={async () => {
@@ -46,6 +46,6 @@ export function DeviceKey({
         }}
       />
       <Button secondary title="Đã lưu khóa, đóng" onPress={onClose} />
-    </Card>
+    </BottomSheet>
   );
 }

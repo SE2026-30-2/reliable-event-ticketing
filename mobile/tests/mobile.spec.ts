@@ -175,11 +175,17 @@ test("callback success code cannot override a pending or failed backend verdict"
     page.getByText("Đang chờ xác nhận", { exact: true }),
   ).toBeVisible();
   await expect(
+    page.getByRole("img", { name: "Kết quả đang chờ xác nhận", exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByText("Thanh toán thành công", { exact: true }),
   ).toHaveCount(0);
   status = "FAILED";
   await page.reload();
   await expect(page.getByText("FAILED", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Kết quả không thành công", exact: true }),
+  ).toBeVisible();
   await page.goto("/payment-result?vnp_ResponseCode=00");
   await expect(
     page.getByText("Thiếu mã giao dịch.", { exact: false }),
@@ -255,29 +261,35 @@ test("account recovery submits backend contracts and validates password confirma
     .getByRole("textbox", { name: "Email", exact: true })
     .fill(profile.email);
   await page
-    .getByRole("button", { name: "Quên mật khẩu", exact: true })
+    .getByRole("button", { name: "Gửi hướng dẫn", exact: true })
     .click();
   await expect(
     page.getByText("Nếu email tồn tại", { exact: false }),
   ).toBeVisible();
   await page.goto("/reset-password?token=reset-token-from-email");
-  await expect(page.getByLabel("Token từ email")).toHaveValue(
+  await expect(page.getByLabel("Token từ email", { exact: true })).toHaveValue(
     "reset-token-from-email",
   );
   await page
     .getByLabel("Mật khẩu mới", { exact: true })
     .fill("new-password-123");
-  await page.getByLabel("Xác nhận mật khẩu mới").fill("different-password");
   await page
-    .getByRole("button", { name: "Đặt lại mật khẩu", exact: true })
+    .getByLabel("Xác nhận mật khẩu mới", { exact: true })
+    .fill("different-password");
+  await page
+    .getByRole("button", { name: "Lưu mật khẩu mới", exact: true })
     .click();
   await expect(
-    page.getByText("Mật khẩu cần ít nhất 8 ký tự", { exact: false }),
+    page
+      .getByRole("alert")
+      .getByText("Mật khẩu cần ít nhất 8 ký tự", { exact: false }),
   ).toBeVisible();
   expect(bodies).toHaveLength(1);
-  await page.getByLabel("Xác nhận mật khẩu mới").fill("new-password-123");
   await page
-    .getByRole("button", { name: "Đặt lại mật khẩu", exact: true })
+    .getByLabel("Xác nhận mật khẩu mới", { exact: true })
+    .fill("new-password-123");
+  await page
+    .getByRole("button", { name: "Lưu mật khẩu mới", exact: true })
     .click();
   await expect(
     page.getByText("Đã đặt lại mật khẩu.", { exact: false }),
@@ -455,9 +467,12 @@ test("legacy pending scan migrates and an incomplete batch never removes it", as
   });
   await page.goto("/checkin");
   await page
+    .getByRole("button", { name: "Cài đặt thiết bị", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Tự đồng bộ: Bật", exact: true })
     .click();
-  await page.getByLabel("Khóa thiết bị").fill("legacy-device");
+  await page.getByLabel("Khóa thiết bị", { exact: true }).fill("legacy-device");
   await expect(page.getByText("CHỜ ĐỒNG BỘ: 1", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "Đồng bộ lượt quét", exact: true })
@@ -491,6 +506,9 @@ test("offline signed scans persist, detect duplicates and keep device queues sep
   });
   await page.goto("/checkin");
   await page
+    .getByRole("button", { name: "Cài đặt thiết bị", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Tự đồng bộ: Bật", exact: true })
     .click();
   await page
@@ -499,7 +517,7 @@ test("offline signed scans persist, detect duplicates and keep device queues sep
   await expect(
     page.getByText("Đã lưu chứng thư xác minh chữ ký QR."),
   ).toBeVisible();
-  await page.getByLabel("Khóa thiết bị").fill("device-a");
+  await page.getByLabel("Khóa thiết bị", { exact: true }).fill("device-a");
   await page.getByLabel("Mã sự kiện để kiểm tra offline").fill(eventId);
   await page.getByLabel("Nội dung mã QR").fill(signedPayload());
   await page.getByRole("button", { name: "Kiểm tra vé", exact: true }).click();
@@ -513,10 +531,15 @@ test("offline signed scans persist, detect duplicates and keep device queues sep
   ).toBeVisible();
   await expect(page.getByText("CHỜ ĐỒNG BỘ: 2", { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Khóa thiết bị")).toHaveValue("");
-  await page.getByLabel("Khóa thiết bị").fill("device-b");
+  await page
+    .getByRole("button", { name: "Cài đặt thiết bị", exact: true })
+    .click();
+  await expect(page.getByLabel("Khóa thiết bị", { exact: true })).toHaveValue(
+    "",
+  );
+  await page.getByLabel("Khóa thiết bị", { exact: true }).fill("device-b");
   await expect(page.getByText("CHỜ ĐỒNG BỘ: 0", { exact: true })).toBeVisible();
-  await page.getByLabel("Khóa thiết bị").fill("device-a");
+  await page.getByLabel("Khóa thiết bị", { exact: true }).fill("device-a");
   await expect(page.getByText("CHỜ ĐỒNG BỘ: 2", { exact: true })).toBeVisible();
 });
 
@@ -765,12 +788,22 @@ test("check-in retries a persisted attempt with the same idempotency key", async
     });
   });
   await page.goto("/checkin");
-  await page.getByLabel("Khóa thiết bị").fill("test-device-key");
+  await page
+    .getByRole("button", { name: "Cài đặt thiết bị", exact: true })
+    .click();
+  await page
+    .getByLabel("Khóa thiết bị", { exact: true })
+    .fill("test-device-key");
   await page.getByLabel("Nội dung mã QR").fill("signed-ticket-payload");
   await page.getByRole("button", { name: "Kiểm tra vé", exact: true }).click();
   await expect(page.getByText("Máy chủ tạm gián đoạn")).toBeVisible();
   await page.reload();
-  await page.getByLabel("Khóa thiết bị").fill("test-device-key");
+  await page
+    .getByRole("button", { name: "Cài đặt thiết bị", exact: true })
+    .click();
+  await page
+    .getByLabel("Khóa thiết bị", { exact: true })
+    .fill("test-device-key");
   await expect(page.getByText("CHỜ ĐỒNG BỘ: 1", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "Đồng bộ lượt quét", exact: true })
@@ -875,7 +908,7 @@ test("anonymous and buyer accounts cannot access management routes", async ({
   page,
 }) => {
   await page.goto("/admin");
-  await expect(page.getByText("Chào bạn đến EventPass")).toBeVisible();
+  await expect(page.getByText("Chào bạn đến EventHub")).toBeVisible();
   await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
   await page.getByLabel("Email", { exact: true }).fill(profile.email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("password123");

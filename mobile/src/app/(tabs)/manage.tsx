@@ -12,6 +12,7 @@ import {
   Title,
 } from "@/components/ui-kit";
 import { EventForm } from "@/components/event-form";
+import { BottomSheet } from "@/components/bottom-sheet";
 import { FilterOptions } from "@/components/filter-options";
 import { managementEvents, normalizeSearch } from "@/lib/management";
 import { useResource } from "@/hooks/use-resource";
@@ -22,6 +23,7 @@ function ManageContent() {
   );
   const resource = useResource(load);
   const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [sort, setSort] = useState("date");
@@ -47,19 +49,27 @@ function ManageContent() {
   );
   return (
     <Screen>
-      <Title>Sự kiện của tôi</Title>
+      <Title>Danh sách sự kiện</Title>
       <Body muted>Tạo sự kiện, quản lý vé và theo dõi hoạt động.</Body>
       <Button
         title={creating ? "Đóng biểu mẫu" : "+ Tạo sự kiện"}
         onPress={() => setCreating(!creating)}
       />
       {creating && (
-        <EventForm
-          onSaved={() => {
-            setCreating(false);
-            resource.reload();
-          }}
-        />
+        <BottomSheet
+          title="Tạo sự kiện mới"
+          close={() => setCreating(false)}
+          busy={saving}
+        >
+          <EventForm
+            embedded
+            onBusyChange={setSaving}
+            onSaved={() => {
+              setCreating(false);
+              resource.reload();
+            }}
+          />
+        </BottomSheet>
       )}
       <Feedback message={resource.error} retry={resource.reload} />
       <Field

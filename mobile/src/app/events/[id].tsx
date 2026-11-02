@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { View } from "react-native";
+import { View, Pressable, Text } from "react-native";
 import {
   Badge,
   Banner,
@@ -14,6 +14,9 @@ import {
   Screen,
   Title,
   styles,
+  colors,
+  Icon,
+  InfoRow,
 } from "@/components/ui-kit";
 import { useAuth } from "@/contexts/auth";
 import { useResource } from "@/hooks/use-resource";
@@ -193,18 +196,56 @@ export default function EventDetail() {
         <Card>
           <Heading>Chọn vé của bạn</Heading>
           {types.length === 0 && <Body muted>Sự kiện chưa mở bán vé.</Body>}
-          {types.map((type) => (
-            <Button
-              key={type.ticketTypeId}
-              secondary={selected?.ticketTypeId !== type.ticketTypeId}
-              title={`${type.name} · ${money(type.priceCents)} · Còn ${type.remaining}`}
-              disabled={busy}
-              onPress={() => {
-                setSelectedId(type.ticketTypeId);
-                setError("");
-              }}
-            />
-          ))}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {types.map((type) => (
+              <Pressable
+                key={type.ticketTypeId}
+                accessibilityRole="button"
+                accessibilityLabel={`${type.name} · ${money(type.priceCents)} · Còn ${type.remaining}`}
+                accessibilityState={{
+                  selected: selected?.ticketTypeId === type.ticketTypeId,
+                  disabled: busy,
+                }}
+                disabled={busy}
+                style={{
+                  minWidth: "44%",
+                  flexGrow: 1,
+                  padding: 12,
+                  gap: 6,
+                  alignItems: "center",
+                  borderWidth: 1.5,
+                  borderColor:
+                    selected?.ticketTypeId === type.ticketTypeId
+                      ? colors.primary
+                      : colors.line,
+                  borderRadius: 12,
+                  backgroundColor:
+                    selected?.ticketTypeId === type.ticketTypeId
+                      ? colors.soft
+                      : "#fff",
+                }}
+                onPress={() => {
+                  setSelectedId(type.ticketTypeId);
+                  setError("");
+                }}
+              >
+                <Icon name="ticket" />
+                <Text style={{ color: colors.ink, fontWeight: "700" }}>
+                  {type.name}
+                </Text>
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontSize: 13,
+                    fontWeight: "700",
+                  }}
+                >
+                  {money(type.priceCents)}
+                </Text>
+                <Body muted>Còn {type.remaining}</Body>
+              </Pressable>
+            ))}
+          </View>
           {selected && (
             <>
               <Body muted>
@@ -248,8 +289,14 @@ export default function EventDetail() {
                   ) : (
                     quote && (
                       <>
-                        <Body>Tạm tính: {money(quote.grossCents)}</Body>
-                        <Body>Giảm giá: {money(quote.discountCents)}</Body>
+                        <InfoRow
+                          label="Tạm tính"
+                          value={money(quote.grossCents)}
+                        />
+                        <InfoRow
+                          label="Giảm giá"
+                          value={money(quote.discountCents)}
+                        />
                         <Heading>Tổng tiền: {money(quote.totalCents)}</Heading>
                       </>
                     )

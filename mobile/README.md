@@ -1,4 +1,6 @@
-# EventPass Mobile
+# EventHub Mobile
+
+Giao diện 18 màn được chỉnh theo ảnh mẫu `EventHub_Mobile_18_Man_Hinh`. Xem [đối chiếu thiết kế và cách kiểm tra](./UI-REFERENCE.vi.md).
 
 Ứng dụng React Native / Expo SDK 58 chuyển các luồng hiện có của `frontend` sang Android và iOS. Dùng Expo Router, TypeScript và API của hệ thống hiện tại. Không dùng WebView hoặc dữ liệu demo trong ứng dụng.
 
