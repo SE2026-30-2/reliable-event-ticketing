@@ -113,9 +113,28 @@ function TicketsContent() {
                     Được mời lúc: {dateTime((item as WaitlistEntry).offeredAt)}
                   </Body>
                   {!!(item as WaitlistEntry).reservationId && (
-                    <Body>
-                      Mã đặt vé: {(item as WaitlistEntry).reservationId}
-                    </Body>
+                    <>
+                      <Body>
+                        Mã đặt vé: {(item as WaitlistEntry).reservationId}
+                      </Body>
+                      <Body muted>
+                        Hạn nhận vé:{" "}
+                        {dateTime((item as WaitlistEntry).offerExpiresAt)}
+                      </Body>
+                      {item.status === "OFFERED" && (
+                        <Button
+                          title="Thanh toán vé được mời"
+                          onPress={() =>
+                            router.push({
+                              pathname: "/checkout/[id]",
+                              params: {
+                                id: (item as WaitlistEntry).reservationId!,
+                              },
+                            })
+                          }
+                        />
+                      )}
+                    </>
                   )}
                   {["WAITING", "OFFERED"].includes(item.status) && (
                     <ConfirmButton
@@ -173,7 +192,18 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
       <Body>Mã vé: {ticket.ticketId}</Body>
       <Body>{money(ticket.priceCents)}</Body>
       {ticket.status === "RESERVED" && (
-        <Body muted>Giữ đến: {dateTime(ticket.reservationExpiresAt)}</Body>
+        <>
+          <Body muted>Giữ đến: {dateTime(ticket.reservationExpiresAt)}</Body>
+          <Button
+            title="Thanh toán / Kiểm tra giao dịch"
+            onPress={() =>
+              router.push({
+                pathname: "/checkout/[id]",
+                params: { id: ticket.reservationId },
+              })
+            }
+          />
+        </>
       )}
       <Button
         secondary

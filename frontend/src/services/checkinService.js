@@ -16,8 +16,13 @@ async function request(path, key, body) {
 const locked = (run) => navigator.locks ? navigator.locks.request('eventhub-checkin', run) : Promise.reject(new Error('Trình duyệt cần hỗ trợ Web Locks để soát vé an toàn. Hãy dùng Chrome, Edge hoặc Safari mới.'));
 const bodyOf = ({ qrPayload, idempotencyKey, clientCheckinAt }) => ({ qrPayload, idempotencyKey, clientCheckinAt });
 function confirmed(scan, response) {
-  if (!response || typeof response.outcome !== 'string') throw new Error('Phản hồi soát vé không hợp lệ. Lượt quét vẫn được giữ để thử lại.');
-  return { ...scan, ...response, pending: false, localOutcome: scan.outcome, qrPayload: undefined };
+  const outcomes = ['ACCEPTED', 'DUPLICATE', 'INVALID_SIGNATURE', 'WRONG_EVENT', 'EXPIRED_WINDOW', 'TICKET_VOIDED', 'DEVICE_NOT_FOUND', 'DEVICE_REVOKED'];
+  if (!response || !outcomes.includes(response.outcome) || !Number.isFinite(Date.parse(response.serverReceivedAt)) ||
+      (response.outcome === 'ACCEPTED' && (!response.ticketId || !Number.isInteger(response.entryNo) || response.entryNo < 1)) ||
+      (scan.ticketId && response.ticketId && scan.ticketId !== response.ticketId)) {
+    throw new Error('Phản hồi soát vé không hợp lệ. Lượt quét vẫn được giữ để thử lại.');
+  }
+  return { ...scan, ticketId: response.ticketId, outcome: response.outcome, detail: response.detail, entryNo: response.entryNo, serverReceivedAt: response.serverReceivedAt, pending: false, localOutcome: scan.outcome, qrPayload: undefined };
 }
 export async function refreshCertificate() {
   const jwks = await request('/.well-known/jwks.json');
@@ -50,12 +55,14 @@ export function submitScan(key, payload, eventId) {
     let scan = { ...verification, device, qrPayload: payload, idempotencyKey: crypto.randomUUID(), clientCheckinAt: new Date().toISOString(), pending: true };
     // Persist before making a network request, including invalid attempts.
     await saveScan(scan);
+    let accepted;
     if (navigator.onLine) {
       try {
-        scan = confirmed(scan, await request('/api/checkin', key, bodyOf(scan)));
-        await saveScan(scan);
+        accepted = confirmed(scan, await request('/api/checkin', key, bodyOf(scan)));
       } catch (error) { scan.networkError = error.message; }
     }
+    // A storage failure is not a network error: keep the durable pending attempt and surface it.
+    if (accepted) { await saveScan(accepted); return accepted; }
     return scan;
   });
 }
@@ -67,7 +74,8 @@ export function syncScans(key) {
       const batch = pending.slice(i, i + 100);
       const responses = await request('/api/checkin/batch', key, batch.map(bodyOf));
       if (!Array.isArray(responses) || responses.length !== batch.length) throw new Error('Phản hồi đồng bộ không đầy đủ; giữ lại hàng đợi.');
-      for (let j = 0; j < batch.length; j++) await saveScan(confirmed(batch[j], responses[j]));
+      const verified = batch.map((scan, index) => confirmed(scan, responses[index]));
+      for (const scan of verified) await saveScan(scan);
       total += batch.length;
     }
     return total;

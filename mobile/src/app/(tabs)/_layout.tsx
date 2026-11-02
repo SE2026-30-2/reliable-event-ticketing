@@ -1,12 +1,13 @@
 import { Tabs } from "expo-router";
 import { Text } from "react-native";
-import { colors } from "@/components/ui-kit";
+import { colors, Loading } from "@/components/ui-kit";
 import { useAuth } from "@/contexts/auth";
 export default function TabLayout() {
-  const { user } = useAuth();
+  const { user, ready } = useAuth();
   const manager = user?.roles.some((role) =>
     ["ADMIN", "ORGANIZER"].includes(role),
   );
+  if (!ready) return <Loading />;
   return (
     <Tabs
       screenOptions={{

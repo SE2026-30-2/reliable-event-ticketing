@@ -8,7 +8,7 @@ const admin = { email: 'admin@example.com', fullName: 'Nguyễn Văn A', roles: 
 async function setup(page, options = {}) {
   const calls = [];
   await page.addInitScript((user) => { localStorage.setItem('user', JSON.stringify(user)); localStorage.setItem('access_token', 'test-token'); }, options.user || admin);
-  await page.route('http://localhost:8091/api/payment/**', async (route) => {
+  await page.route('http://localhost:8091/api/**', async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204 });
     calls.push({ method: req.method(), url: req.url(), auth: req.headers().authorization, body: req.postData() });
@@ -40,9 +40,9 @@ test('validates UUID, uses authenticated reservation lookup and converts cents c
   await page.getByRole('button', { name: '⌕ Tra cứu', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('UUID');
   expect(calls).toHaveLength(0);
-  await expect(page.getByRole('radio', { name: /Payment ID/ })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /Payment ID/ })).toBeEnabled();
   await lookup(page);
-  expect(calls).toEqual([{ method: 'GET', url: `http://localhost:8091/api/payment/requests/by-reservation/${reservationId}`, auth: 'Bearer test-token', body: null }]);
+  expect(calls).toEqual([{ method: 'GET', url: `http://localhost:8091/api/admin/payments/by-reservation/${reservationId}`, auth: 'Bearer test-token', body: null }]);
   await expect(page.locator('.ap-amount')).toHaveText(/2\.200\.000/);
   await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toBeEnabled();
 });
@@ -68,6 +68,31 @@ test('refund waits for server confirmation, blocks double submit and prevents di
   await expect(dialog).not.toBeVisible();
   await expect(page.locator('.ap-panel-title')).toContainText('Đã hoàn tiền');
   await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toBeDisabled();
+});
+
+test('admin can look up a customer payment by payment ID', async ({ page }) => {
+  const calls = await setup(page);
+  await page.getByRole('radio', { name: /Payment ID/ }).check();
+  await page.getByRole('textbox', { name: 'Mã thanh toán', exact: true }).fill(paymentRequestId);
+  await page.getByRole('button', { name: '⌕ Tra cứu', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Thông tin giao dịch' })).toBeVisible();
+  expect(calls[0].url).toBe(`http://localhost:8091/api/admin/payments/${paymentRequestId}`);
+  await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toBeEnabled();
+});
+
+test('a response for a different reservation cannot enable a refund', async ({ page }) => {
+  await setup(page, { payment: { reservationId: paymentRequestId } });
+  await page.getByRole('textbox', { name: 'Mã đặt chỗ', exact: true }).fill(reservationId);
+  await page.getByRole('button', { name: '⌕ Tra cứu', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toHaveCount(0);
+});
+
+test('editing the lookup ID removes the previous payment before another lookup', async ({ page }) => {
+  await setup(page); await lookup(page);
+  await page.getByRole('textbox', { name: 'Mã đặt chỗ', exact: true }).fill(paymentRequestId);
+  await expect(page.getByRole('heading', { name: 'Thông tin giao dịch' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toHaveCount(0);
 });
 
 for (const change of [{ provider: 'MOCK' }, { provider: 'FREE', amountCents: 0 }, { status: 'PENDING' }, { status: 'FAILED' }, { status: 'REFUND_REQUIRED' }, { status: 'REFUNDED' }]) {
@@ -99,9 +124,9 @@ test('refund conflict keeps payment unchanged and requires lookup before retry',
   await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toBeEnabled();
 });
 
-for (const outcome of ['network', 'pending', 'wrong-payment']) {
+for (const outcome of ['network', 'pending', 'wrong-payment', 'wrong-amount', 'wrong-provider']) {
   test(`requires lookup after an unconfirmed refund: ${outcome}`, async ({ page }) => {
-    const calls = await setup(page, { refund: (route) => outcome === 'network' ? route.abort('failed') : route.fulfill({ json: { ...payment, status: outcome === 'pending' ? 'PENDING' : 'REFUNDED', paymentRequestId: outcome === 'wrong-payment' ? reservationId : paymentRequestId } }) });
+    const calls = await setup(page, { refund: (route) => outcome === 'network' ? route.abort('failed') : route.fulfill({ json: { ...payment, status: outcome === 'pending' ? 'PENDING' : 'REFUNDED', paymentRequestId: outcome === 'wrong-payment' ? reservationId : paymentRequestId, amountCents: outcome === 'wrong-amount' ? 1 : payment.amountCents, provider: outcome === 'wrong-provider' ? 'MOCK' : payment.provider } }) });
     await lookup(page);
     await page.getByRole('button', { name: '↶ Hoàn tiền', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận hoàn tiền', exact: true }).click();
@@ -116,7 +141,7 @@ for (const outcome of ['network', 'pending', 'wrong-payment']) {
 
 test('a failed second lookup removes the previous transaction', async ({ page }) => {
   await setup(page); await lookup(page);
-  await page.route(`http://localhost:8091/api/payment/requests/by-reservation/${reservationId}`, (route) => route.fulfill({ status: 404, json: {} }));
+  await page.route(`http://localhost:8091/api/admin/payments/by-reservation/${reservationId}`, (route) => route.fulfill({ status: 404, json: {} }));
   await page.getByRole('button', { name: '⌕ Tra cứu', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Không tìm thấy');
   await expect(page.getByRole('heading', { name: 'Thông tin giao dịch' })).toHaveCount(0);

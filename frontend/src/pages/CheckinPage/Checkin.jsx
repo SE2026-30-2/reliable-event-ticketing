@@ -56,14 +56,14 @@ export default function Checkin() {
     if (!payload || processing.current) return;
     if (!key) { setMessage('Lưu API Key thiết bị trước khi soát vé.'); return; }
     if (last.current.payload === payload && Date.now() - last.current.at < 3000) return;
-    processing.current = true; setBusy(true); setMessage('');
+    processing.current = true; setBusy(true); setMessage(''); setResult(null);
     last.current = { payload, at: Date.now() };
     try {
       const record = await submitScan(key, payload, savedEventId);
       setResult(record); setInput('');
-      if (record.networkError) setMessage('Chưa kết nối được máy chủ. Lượt quét đã lưu trên thiết bị và sẽ tự gửi lại.');
+      if (record.networkError) setMessage(`Chưa xác nhận được lượt quét: ${record.networkError}`);
       await reload();
-    } catch (e) { setResult(null); setMessage(`Không thể soát vé: ${e.message}`); }
+    } catch (e) { setResult(null); setMessage(`Không thể soát vé: ${e.message}`); await reload().catch(() => undefined); }
     finally { processing.current = false; setBusy(false); }
   }
   function saveDevice(e) {

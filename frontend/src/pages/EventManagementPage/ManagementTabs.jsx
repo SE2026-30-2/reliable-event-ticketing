@@ -17,7 +17,7 @@ export function TicketTypes({ api, event, changed }) {
     const [validFrom, validUntil] = dateRange(form.validFrom, form.validUntil);
     return api.createTicketType(event.eventId, { name: requiredText(form.name, 'tên loại vé'), priceCents: toCents(form.price), quota: Number(form.quota), maxEntries: Number(form.maxEntries), bundleSize: Number(form.bundleSize), validFrom, validUntil });
   }
-  return <Panel title="Loại vé" action={<button className="primary" disabled={event.status === 'CANCELLED'} onClick={() => setCreating(true)}>+ Tạo loại vé</button>}>
+  return <Panel title="Loại vé" action={<button className="primary" disabled={['CANCELLED', 'COMPLETED'].includes(event.status)} onClick={() => setCreating(true)}>+ Tạo loại vé</button>}>
     <p className="em-muted">Giá theo đơn vị bán. Vé gói phát hành nhiều vé cho mỗi đơn vị; khung giờ bên dưới là thời gian check-in.</p>
     <ResourceState resource={resource} retry={() => setRefresh((n) => n + 1)} />
     {resource.data && <Table headers={['Tên loại vé', 'Giá / đơn vị', 'Quota', 'Đã phát hành', 'Còn lại', 'Lượt vào / vé', 'Vé / gói', 'Khung check-in']} rows={resource.data.map((t) => ({ key: t.ticketTypeId, cells: [<strong>{t.name}</strong>, money(t.priceCents), number(t.quota), number(t.issuedCount), number(t.remaining), t.maxEntries, t.bundleSize, <>{dateTime(t.validFrom)}<br />{dateTime(t.validUntil)}</>] }))} empty="Chưa có loại vé. Tạo loại vé đầu tiên để bắt đầu mở bán." />}
@@ -39,7 +39,7 @@ export function Coupons({ api, event, changed, types }) {
     if (form.validFrom && form.validUntil) dateRange(form.validFrom, form.validUntil);
     return api.createCoupon(event.eventId, body);
   }
-  return <Panel title="Mã giảm giá" action={<button className="primary" disabled={event.status === 'CANCELLED'} onClick={() => setCreating(true)}>+ Tạo mã giảm giá</button>}><ResourceState resource={resource} retry={() => setRefresh((n) => n + 1)} />
+  return <Panel title="Mã giảm giá" action={<button className="primary" disabled={['CANCELLED', 'COMPLETED'].includes(event.status)} onClick={() => setCreating(true)}>+ Tạo mã giảm giá</button>}><ResourceState resource={resource} retry={() => setRefresh((n) => n + 1)} />
     {resource.data && <Table headers={['Mã', 'Giảm giá', 'Đã dùng / giới hạn', 'Loại vé', 'Hiệu lực', 'Trạng thái', 'Thao tác']} rows={resource.data.map((c) => ({ key: c.couponId, cells: [<span className="em-code">{c.code}</span>, c.type === 'PERCENT' ? `${c.value}%` : money(c.value), `${number(c.redeemedCount)} / ${c.maxRedemptions ?? 'Không giới hạn'}`, c.ticketTypeId ? types.find((t) => t.ticketTypeId === c.ticketTypeId)?.name || c.ticketTypeId : 'Tất cả', <>{dateTime(c.validFrom)}<br />{dateTime(c.validUntil)}</>, c.active ? 'Đang bật' : 'Đang tắt', <ActionForm submit={() => api.setCouponActive(event.eventId, c.couponId, !c.active)} complete={() => changed(`Đã ${c.active ? 'tắt' : 'bật'} mã ${c.code}.`)} label={c.active ? 'Tắt' : 'Bật'} />] }))} empty="Chưa có mã giảm giá." />}
     {creating && <Dialog title="Tạo mã giảm giá" close={() => setCreating(false)}><ActionForm submit={create} complete={() => changed('Đã tạo mã giảm giá.')} cancel={() => setCreating(false)} label="Tạo mã"><Field label="Mã giảm giá" name="code" required minLength={3} maxLength={40} placeholder="VD: DREAMS20" /><div className="em-form-grid"><Field label="Hình thức"><select name="type" value={discountType} onChange={(e) => setDiscountType(e.target.value)}><option value="PERCENT">Phần trăm (%)</option><option value="FIXED">Số tiền (VNĐ)</option></select></Field><Field label={discountType === 'PERCENT' ? 'Giá trị giảm (%)' : 'Giá trị giảm (VNĐ / đơn vị vé)'} name="value" type="number" min="1" max={discountType === 'PERCENT' ? 100 : undefined} step="1" required /></div><TypeSelect types={types} optional /><Field label="Giới hạn lượt dùng (để trống = không giới hạn)" name="maxRedemptions" type="number" min="1" step="1" /><DateFields required={false} /></ActionForm></Dialog>}
   </Panel>;
@@ -61,7 +61,7 @@ export function Guests({ api, event, changed, types }) {
       throw error;
     }
   }
-  const unavailable = !types.length || event.status === 'CANCELLED' || new Date(event.endsAt) <= new Date();
+  const unavailable = !types.length || ['CANCELLED', 'COMPLETED'].includes(event.status) || new Date(event.endsAt) <= new Date();
   return <Panel title="Phát vé mời"><p className="em-muted">Mỗi dòng gồm họ tên và email, phân cách bằng dấu phẩy. Tối đa 200 khách. Vé mời trừ quota; hệ thống gửi email cho khách sau khi phát hành.</p>
     {outcome && <Message error={Boolean(outcome.failed || outcome.uncertain)}>{outcome.uncertain ? 'Chưa xác nhận được kết quả phát vé. Kiểm tra danh sách vé trước khi thử lại để tránh phát trùng.' : `Thành công: ${outcome.success} vé · Thất bại: ${outcome.failed} vé.`}</Message>}
     {unavailable ? <Message>Chỉ phát vé mời khi sự kiện chưa kết thúc, chưa bị hủy và đã có loại vé.</Message> : <ActionForm submit={issue} label="Phát vé mời" resetOnSuccess><TypeSelect types={types} /><Field label="Danh sách khách mời"><textarea name="guests" required rows={9} placeholder={'Nguyễn Minh Anh, anh@example.com\nTrần Hoàng Nam, nam@example.com'} /></Field><p className="em-muted">Cả danh sách được xử lý cùng nhau. Nếu không đủ quota, không vé nào trong yêu cầu được phát hành.</p></ActionForm>}
@@ -72,14 +72,26 @@ export function Guests({ api, event, changed, types }) {
 export function Devices({ api, event, changed }) {
   const [refresh, setRefresh] = useState(0), [secret, setSecret] = useState(null), [target, setTarget] = useState(null), [copyState, setCopyState] = useState('');
   const resource = useResource(api.devices, [event.eventId], refresh);
+  async function register(form) {
+    try {
+      const device = await api.createDevice(event.eventId, requiredText(form.label, 'tên thiết bị'));
+      if (!device?.deviceId || typeof device.apiKey !== 'string' || !device.apiKey.trim()) throw new Error('Máy chủ chưa trả khóa thiết bị. Kiểm tra danh sách, thu hồi thiết bị vừa tạo và tạo lại nếu không có khóa.');
+      return device;
+    } finally { setRefresh((n) => n + 1); }
+  }
+  async function revoke() {
+    const result = await api.revokeDevice(target.deviceId);
+    if (!result || result.deviceId !== target.deviceId || result.status !== 'REVOKED') throw new Error('Máy chủ chưa xác nhận thu hồi đúng thiết bị. Hãy tải lại danh sách.');
+    return result;
+  }
   async function copy() {
     try { await navigator.clipboard.writeText(secret); setCopyState('Đã sao chép API Key.'); }
     catch { setCopyState('Không thể sao chép tự động. Hãy chọn và sao chép khóa bên dưới.'); }
   }
   return <div className="em-split"><Panel title="Thiết bị soát vé"><ResourceState resource={resource} retry={() => setRefresh((n) => n + 1)} />{resource.data && <Table headers={['Thiết bị', 'Trạng thái', 'Hoạt động lần cuối', 'Thao tác']} rows={resource.data.map((d) => ({ key: d.deviceId, cells: [<><strong>{d.label}</strong><small>{d.deviceId}</small></>, <Badge status={d.status} />, dateTime(d.lastSeenAt), d.status === 'ACTIVE' ? <button className="danger-text" onClick={() => setTarget(d)}>Thu hồi</button> : '—'] }))} empty="Chưa có thiết bị cho sự kiện này." />}</Panel>
-    <Panel title="Đăng ký thiết bị"><ActionForm submit={(form) => api.createDevice(event.eventId, requiredText(form.label, 'tên thiết bị'))} complete={(device) => { setSecret(device.apiKey); setCopyState(''); setRefresh((n) => n + 1); }} label="Tạo thiết bị"><Field label="Tên thiết bị" name="label" required maxLength={255} placeholder="VD: Cổng A · Máy 01" /><p className="em-muted">Thiết bị chỉ được soát vé cho sự kiện này. Khóa truy cập chỉ hiển thị một lần sau khi tạo.</p></ActionForm></Panel>
+    <Panel title="Đăng ký thiết bị"><ActionForm submit={register} complete={(device) => { setSecret(device.apiKey); setCopyState(''); }} label="Tạo thiết bị"><Field label="Tên thiết bị" name="label" required maxLength={255} placeholder="VD: Cổng A · Máy 01" /><p className="em-muted">Thiết bị chỉ được soát vé cho sự kiện này. Khóa truy cập chỉ hiển thị một lần sau khi tạo.</p></ActionForm></Panel>
     {secret && <Dialog title="Lưu khóa thiết bị" close={() => setSecret(null)}><Message>API Key chỉ hiển thị trong lần này. Hãy lưu ở nơi an toàn trước khi đóng.</Message><code className="em-secret">{secret}</code><div className="em-form-actions"><button onClick={copy}>Copy API Key</button><button className="primary" onClick={() => setSecret(null)}>Đã lưu, đóng</button></div>{copyState && <Message>{copyState}</Message>}</Dialog>}
-    {target && <Dialog title="Thu hồi thiết bị?" close={() => setTarget(null)}><ActionForm submit={() => api.revokeDevice(target.deviceId)} complete={() => changed('Đã thu hồi thiết bị.')} cancel={() => setTarget(null)} label="Xác nhận thu hồi" danger><p>Thiết bị <strong>{target.label}</strong> sẽ không thể soát vé. Thao tác này không thể khôi phục.</p></ActionForm></Dialog>}
+    {target && <Dialog title="Thu hồi thiết bị?" close={() => setTarget(null)}><ActionForm submit={revoke} complete={() => changed('Đã thu hồi thiết bị.')} cancel={() => setTarget(null)} label="Xác nhận thu hồi" danger><p>Thiết bị <strong>{target.label}</strong> sẽ không thể soát vé. Thao tác này không thể khôi phục.</p></ActionForm></Dialog>}
   </div>;
 }
 

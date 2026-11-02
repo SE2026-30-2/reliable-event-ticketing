@@ -21,6 +21,26 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ title: "Đăng nhập" }} />
           <Stack.Screen name="register" options={{ title: "Tạo tài khoản" }} />
           <Stack.Screen
+            name="forgot-password"
+            options={{ title: "Quên mật khẩu" }}
+          />
+          <Stack.Screen
+            name="reset-password"
+            options={{ title: "Đặt lại mật khẩu" }}
+          />
+          <Stack.Screen
+            name="verify-email"
+            options={{ title: "Xác minh email" }}
+          />
+          <Stack.Screen
+            name="checkout/[id]"
+            options={{ title: "Thanh toán" }}
+          />
+          <Stack.Screen
+            name="payment-result"
+            options={{ title: "Kết quả thanh toán" }}
+          />
+          <Stack.Screen
             name="events/[id]"
             options={{ title: "Chi tiết sự kiện" }}
           />

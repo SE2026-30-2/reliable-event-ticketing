@@ -6,7 +6,7 @@ import { manageEventService, managementError } from '../../services/manageEventS
 import './manage-events.css'
 
 const emptyForm = { name: '', venue: '', description: '', startsAt: '', endsAt: '', bannerUrl: '' }
-const tabs = [['ALL', 'Tất cả'], ['DRAFT', 'Đang nháp'], ['PUBLISHED', 'Đã xuất bản'], ['CANCELLED', 'Đã hủy']]
+const tabs = [['ALL', 'Tất cả'], ['DRAFT', 'Đang nháp'], ['PUBLISHED', 'Đã xuất bản'], ['CANCELLED', 'Đã hủy'], ['COMPLETED', 'Đã kết thúc']]
 const number = new Intl.NumberFormat('vi-VN')
 const previewEvents = [
   ['The Dreams Concert 2025', 'SVD Mỹ Đình, Hà Nội', 'PUBLISHED', '2025-10-25', '🎤', 12560, 15000],
@@ -53,11 +53,13 @@ export default function ManageEvents({ preview = false }) {
   const formRef = useRef(null)
   const searchInput = useRef(null)
   const cancelDialog = useRef(null)
+  const mutationLock = useRef(false)
 
   useEffect(() => {
     if (preview) return
     const controller = new AbortController()
     manageEventService.list(controller.signal).then((data) => {
+      if (controller.signal.aborted) return
       setEvents(data)
       setLoadError('')
     }).catch((error) => {
@@ -107,12 +109,12 @@ export default function ManageEvents({ preview = false }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (busy) return
+    if (mutationLock.current) return
     const status = event.nativeEvent.submitter?.value || editing?.status || 'DRAFT'
     if (!form.name.trim() || !form.venue.trim() || !form.description.trim()) {
       setNotice({ error: true, text: 'Vui lòng nhập đầy đủ tên, mô tả và địa điểm sự kiện.' }); return
     }
-    if (new Date(form.endsAt) <= new Date(form.startsAt)) {
+    if (!Number.isFinite(Date.parse(form.startsAt)) || !Number.isFinite(Date.parse(form.endsAt)) || new Date(form.endsAt) <= new Date(form.startsAt)) {
       setNotice({ error: true, text: 'Thời gian kết thúc phải sau thời gian bắt đầu.' }); return
     }
     if (!editing && new Date(form.startsAt) <= new Date()) {
@@ -123,6 +125,7 @@ export default function ManageEvents({ preview = false }) {
     }
     const body = { ...form, name: form.name.trim(), venue: form.venue.trim(), startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() }
     if (!editing || editing.status !== status) body.status = status
+    mutationLock.current = true
     setBusy(true)
     setNotice(null)
     try {
@@ -134,11 +137,12 @@ export default function ManageEvents({ preview = false }) {
       setQuery('')
       setNotice({ text: `${preview ? 'Bản xem thử: ' : ''}${status === 'PUBLISHED' ? 'Đã lưu sự kiện đã xuất bản.' : 'Đã lưu bản nháp.'}` })
     } catch (error) { setNotice({ error: true, text: managementError(error) }) }
-    finally { setBusy(false) }
+    finally { mutationLock.current = false; setBusy(false) }
   }
 
   async function cancelEvent() {
-    if (!cancelTarget || busy) return
+    if (!cancelTarget || mutationLock.current) return
+    mutationLock.current = true
     setBusy(true)
     try {
       const saved = preview ? { ...cancelTarget, status: 'CANCELLED' } : await manageEventService.update(cancelTarget.eventId, { status: 'CANCELLED' })
@@ -147,7 +151,7 @@ export default function ManageEvents({ preview = false }) {
       setCancelTarget(null)
       setNotice({ text: 'Đã hủy sự kiện.' })
     } catch (error) { setCancelTarget(null); setNotice({ error: true, text: managementError(error) }) }
-    finally { setBusy(false) }
+    finally { mutationLock.current = false; setBusy(false) }
   }
 
   const canEdit = preview || (!loading && !loadError)
@@ -175,7 +179,7 @@ export default function ManageEvents({ preview = false }) {
         <form onSubmit={submit}><fieldset disabled={busy || !canEdit}>
           <label className="manage-field">Tên sự kiện <b>*</b><input ref={nameInput} name="name" value={form.name} onChange={updateField} placeholder="Nhập tên sự kiện..." required maxLength={255} /></label>
           <label className="manage-field">Danh mục<select disabled aria-describedby="category-help"><option>♫ Chọn danh mục</option></select><small id="category-help">Danh mục sẽ được hỗ trợ sau.</small></label>
-          <label className="manage-field">Mô tả sự kiện <b>*</b><textarea name="description" value={form.description} onChange={updateField} placeholder="Giới thiệu về sự kiện của bạn..." maxLength={1000} required rows={3} /><span className="manage-counter">{form.description.length}/1000</span></label>
+          <label className="manage-field">Mô tả sự kiện <b>*</b><textarea name="description" value={form.description} onChange={updateField} placeholder="Giới thiệu về sự kiện của bạn..." maxLength={5000} required rows={3} /><span className="manage-counter">{form.description.length}/5000</span></label>
           <label className="manage-field">Địa điểm <b>*</b><input name="venue" value={form.venue} onChange={updateField} placeholder="Nhập địa điểm tổ chức..." maxLength={255} required /></label>
           <div className="manage-field">Thời gian diễn ra <b>*</b><div className="manage-date-range"><label>Từ ngày<input aria-label="Ngày giờ bắt đầu" type="datetime-local" name="startsAt" value={form.startsAt} onChange={updateField} required /></label><span aria-hidden="true">→</span><label>Đến ngày<input aria-label="Ngày giờ kết thúc" type="datetime-local" name="endsAt" value={form.endsAt} min={form.startsAt} onChange={updateField} required /></label></div><small>Theo múi giờ thiết bị: {Intl.DateTimeFormat().resolvedOptions().timeZone}</small></div>
           <div className="manage-field">Thời gian mở bán vé<div className="manage-date-range unavailable"><span>▣ Từ ngày</span><span>→</span><span>Đến ngày</span></div><small>Lịch mở bán riêng sẽ được hỗ trợ sau.</small></div>

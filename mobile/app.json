@@ -40,7 +40,8 @@
           "cameraPermission": "Cho phép EventPass dùng camera để quét mã QR vé.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

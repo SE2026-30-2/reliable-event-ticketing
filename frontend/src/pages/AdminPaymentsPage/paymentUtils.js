@@ -16,8 +16,8 @@ export const previewPayment = {
 export function createPreviewService() {
   let payment = { ...previewPayment };
   return {
-    lookup: async (id) => {
-      if (id.toLowerCase() !== payment.reservationId) throw { response: { status: 404 } };
+    lookup: async (id, _signal, kind = 'reservation') => {
+      if (id.toLowerCase() !== (kind === 'payment' ? payment.paymentRequestId : payment.reservationId)) throw { response: { status: 404 } };
       return { ...payment };
     },
     refund: async () => { payment = { ...payment, status: 'REFUNDED' }; return { ...payment }; },

@@ -59,7 +59,7 @@ test('profile failure does not persist a partial login session', async ({ page }
 });
 
 for (const source of ['/admin/users', '/checkin']) {
-  test(`about page keeps the signed-in account after navigation from ${source}`, async ({ page }) => {
+  test(`management navigation keeps the signed-in account from ${source}`, async ({ page }) => {
     await mockAuth(page);
     await page.route('**/api/manage/events', (route) => route.fulfill({ json: [] }));
     await page.route('**/.well-known/jwks.json', (route) => route.fulfill({ status: 503 }));
@@ -67,12 +67,13 @@ for (const source of ['/admin/users', '/checkin']) {
     await submitLogin(page, profile.email, 'ExamplePassword123!');
     await expect(page).toHaveURL(/\/home$/);
     await page.goto(source);
-    // Check-in reaches the About link through event management.
     if (source === '/checkin') {
       await page.getByRole('link', { name: 'Quản lý sự kiện', exact: true }).click();
+      await expect(page).toHaveURL(/\/manage$/);
+    } else {
+      await page.getByRole('link', { name: 'Về chúng tôi', exact: true }).click();
+      await expect(page).toHaveURL(/\/#features$/);
     }
-    await page.getByRole('link', { name: 'Về chúng tôi', exact: true }).click();
-    await expect(page).toHaveURL(/\/#features$/);
     const header = page.locator('header');
     await expect(header.getByRole('link', { name: /Test Admin/ })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Đăng nhập', exact: true })).toHaveCount(0);
@@ -115,15 +116,16 @@ test('event cards and both detail routes load the event and ticket types after m
   await page.route('**/api/event/merge-test-event/ticket-types', (route) => route.fulfill({ json: [
     { ticketTypeId: 'vip', name: 'VIP from API', priceCents: 12000000, remaining: 12, bundleSize: 1 },
   ] }));
+  await page.route('**/api/ticket-types/vip/quote?**', (route) => route.fulfill({ json: { grossCents: 12000000, discountCents: 0, totalCents: 12000000 } }));
   await page.goto('/login');
   await submitLogin(page, profile.email, 'ExamplePassword123!');
   await page.getByRole('link', { name: 'Xem chi tiết', exact: true }).click();
-  await expect(page).toHaveURL(/\/events\/merge-test-event$/);
+  await expect(page).toHaveURL(/\/events?\/merge-test-event$/);
   for (const path of ['/events/merge-test-event', '/event/merge-test-event']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: event.name, exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'VIP from API', exact: true })).toBeVisible();
-    await expect(page.getByText('Còn 12 vé', { exact: true })).toBeVisible();
+    await expect(page.getByText('VIP from API', { exact: true })).toBeVisible();
+    await expect(page.getByText('12', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
   }
 });

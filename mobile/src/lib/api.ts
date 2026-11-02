@@ -7,7 +7,9 @@ const host =
   (Platform.OS === "android" ? "10.0.2.2" : "localhost");
 export const endpoints = {
   identity: (
-    process.env.EXPO_PUBLIC_USER_SERVICE_URL || `http://${host}:8087`
+    process.env.EXPO_PUBLIC_IDENTITY_SERVICE_URL ||
+    process.env.EXPO_PUBLIC_USER_SERVICE_URL ||
+    `http://${host}:8087`
   ).replace(/\/$/, ""),
   ticketing: (
     process.env.EXPO_PUBLIC_TICKETING_SERVICE_URL || `http://${host}:8091`
@@ -88,6 +90,7 @@ export async function request<T>(
         response.status,
         data?.message ||
           data?.detail ||
+          data?.error ||
           (response.status === 401
             ? "Phiên đăng nhập đã hết hạn."
             : response.status === 403

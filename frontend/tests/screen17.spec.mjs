@@ -145,6 +145,16 @@ test('revocation requires confirmation, preserves data on failure, and updates o
   expect(calls.filter((call) => call.method === 'PATCH').every((call) => call.url.endsWith('/device-global/revoke'))).toBe(true);
 });
 
+test('HTTP 200 with an active device cannot be presented as a successful revocation', async ({ page }) => {
+  await setup(page, { revoke: (route) => route.fulfill({ json: initial[0] }) });
+  await page.goto('/admin/devices');
+  await page.getByRole('button', { name: 'Thu hồi Cổng chính', exact: true }).click();
+  await page.getByRole('button', { name: 'Xác nhận thu hồi', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('chưa xác nhận thu hồi đúng thiết bị');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByText('Đã thu hồi thiết bị.')).toHaveCount(0);
+});
+
 test('list errors show unavailable counts, block creation and allow retry', async ({ page }) => {
   await setup(page, { listStatus: 401 });
   await page.goto('/admin/devices');

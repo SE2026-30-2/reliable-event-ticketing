@@ -65,6 +65,11 @@ function UserDialog({ target, api, close, changed, currentUser }) {
       const result = ['grant', 'revoke'].includes(action)
         ? await api.roles(detail.id, organizerRoles(fresh, action === 'grant'))
         : await api.status(detail.id, action === 'lock' ? 'LOCKED' : 'ACTIVE');
+      const expectedRoles = organizerRoles(fresh, action === 'grant');
+      if (!result || result.id !== detail.id || !Array.isArray(result.roles) ||
+          (['grant', 'revoke'].includes(action) ? result.roles.length !== expectedRoles.length || expectedRoles.some((role) => !result.roles.includes(role)) : result.status !== (action === 'lock' ? 'LOCKED' : 'ACTIVE'))) {
+        throw new Error('Máy chủ chưa xác nhận đúng thay đổi tài khoản. Hãy tải lại danh sách trước khi thử tiếp.');
+      }
       changed(result, `${title} thành công cho ${result.fullName || result.email}.`);
     } catch (failure) { setError(adminUserError(failure)); }
     finally { lock.current = false; setBusy(false); }

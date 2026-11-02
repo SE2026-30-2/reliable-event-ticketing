@@ -68,7 +68,11 @@ function RevokeDialog({ device, api, close, complete }) {
     event.preventDefault();
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
-    try { complete(await api.revoke(device.deviceId)); }
+    try {
+      const result = await api.revoke(device.deviceId);
+      if (!result || result.deviceId !== device.deviceId || result.status !== 'REVOKED') throw new Error('Máy chủ chưa xác nhận thu hồi đúng thiết bị. Hãy tải lại danh sách trước khi thử tiếp.');
+      complete(result);
+    }
     catch (failure) { setError(deviceError(failure)); }
     finally { lock.current = false; setBusy(false); }
   }

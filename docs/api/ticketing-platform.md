@@ -153,6 +153,14 @@ Callback server→server của VNPay (**công khai vì VNPay không có JWT — 
 ### `POST /api/payment/requests/{paymentRequestId}/refund` 🛡
 Chỉ ADMIN. Hoàn tiền toàn phần một payment VNPay `COMPLETED`: gọi API refund, payment → `REFUNDED`, event `payment-refunded` làm vé `REFUNDED`. Payment khác trạng thái/nhà cung cấp, hoặc VNPay từ chối → `409`.
 
+### `GET /api/admin/payments/by-reservation/{reservationId}` 🛡
+
+Chỉ ADMIN: tra cứu payment của bất kỳ tài khoản nào bằng reservation UUID. Trả `PaymentRequestResponse` như API tạo payment, không gọi gateway hoặc thay đổi trạng thái. Không phụ thuộc bật online payment; hỗ trợ các payment VNPay/FREE/MOCK đã được lưu. API buyer ở trên vẫn chỉ cho chủ reservation.
+
+### `GET /api/admin/payments/{paymentRequestId}` 🛡
+
+Chỉ ADMIN: tra cứu toàn hệ thống bằng payment UUID, cùng response và phạm vi provider như endpoint trên. Với cả hai API quản trị: anonymous `401`, USER/ORGANIZER `403`, UUID sai `400`, không có payment `404`. Màn quản trị cần triển khai cùng backend có `AdminPaymentController`.
+
 ## Thiết bị check-in (module checkin)
 
 ### `POST /api/checkin/devices` 🔑
