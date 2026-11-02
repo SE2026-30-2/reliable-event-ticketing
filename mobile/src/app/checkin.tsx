@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Crypto from "expo-crypto";
+import { useNetworkState } from "expo-network";
 import { AppState, View } from "react-native";
 import {
   Badge,
@@ -14,28 +14,22 @@ import {
   Screen,
   Title,
 } from "@/components/ui-kit";
-import { request } from "@/lib/api";
-import { storage } from "@/lib/storage";
+import {
+  certificate,
+  historyFor,
+  migratePending,
+  refreshCertificate,
+  submitScan,
+  syncScans,
+  type Scan,
+} from "@/lib/checkin";
 import { dateTime, messageOf } from "@/lib/types";
-interface ScanBody {
-  qrPayload: string;
-  idempotencyKey: string;
-  clientCheckinAt: string;
-}
-interface Pending {
-  device: string;
-  body: ScanBody;
-}
-interface Result {
-  ticketId?: string;
-  outcome: string;
-  detail?: string;
-  serverReceivedAt: string;
-  entryNo?: number;
-}
+
 export default function Checkin() {
   const [permission, requestPermission] = useCameraPermissions();
+  const network = useNetworkState();
   const [deviceKey, setDeviceKey] = useState("");
+  const [eventId, setEventId] = useState("");
   const [payload, setPayload] = useState("");
   const [camera, setCamera] = useState(false);
   const [focused, setFocused] = useState(true);
@@ -46,8 +40,14 @@ export default function Checkin() {
   const lock = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-  const [pending, setPending] = useState<Pending | null>(null);
-  const [result, setResult] = useState<Result>();
+  const [notice, setNotice] = useState("");
+  const [certificateAt, setCertificateAt] = useState<string>();
+  const [history, setHistory] = useState<Scan[]>([]);
+  const [result, setResult] = useState<Scan>();
+  const [filter, setFilter] = useState("all");
+  const [limit, setLimit] = useState(30);
+  const [autoSync, setAutoSync] = useState(true);
+  const [scannerInput, setScannerInput] = useState(false);
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
@@ -65,65 +65,43 @@ export default function Checkin() {
   }, []);
   useEffect(() => {
     let active = true;
-    storage
-      .get("eventpass.pending-scan")
-      .then((value) => {
-        if (active && value) setPending(JSON.parse(value));
-      })
-      .catch((error) => {
-        if (active) setError(messageOf(error));
-      })
-      .finally(() => {
-        if (active) setReady(true);
-      });
+    (async () => {
+      await migratePending();
+      const cached = await certificate();
+      if (active) {
+        setCertificateAt(cached?.updatedAt);
+        setReady(true);
+      }
+    })().catch((error) => {
+      if (active) setError(messageOf(error));
+    });
     return () => {
       active = false;
     };
   }, []);
-  async function scan(value: string) {
-    if (
-      lock.current ||
-      !ready ||
-      !deviceKey.trim() ||
-      (!value.trim() && !pending)
-    )
-      return;
+  useEffect(() => {
+    let active = true;
+    if (deviceKey.trim() && ready)
+      historyFor(deviceKey.trim())
+        .then((scans) => {
+          if (active) setHistory(scans);
+        })
+        .catch((error) => {
+          if (active) setError(messageOf(error));
+        });
+    return () => {
+      active = false;
+    };
+  }, [deviceKey, ready]);
+  async function act(task: () => Promise<void>) {
+    if (lock.current || !ready) return;
     lock.current = true;
     setBusy(true);
     setCamera(false);
     setError("");
-    setResult(undefined);
+    setNotice("");
     try {
-      const device = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        deviceKey.trim(),
-      );
-      if (pending && pending.device !== device)
-        throw new Error(
-          "Lượt quét chưa xác nhận thuộc khóa thiết bị khác. Nhập đúng khóa để thử lại.",
-        );
-      const entry: Pending = pending || {
-        device,
-        body: {
-          qrPayload: value.trim(),
-          idempotencyKey: Crypto.randomUUID(),
-          clientCheckinAt: new Date().toISOString(),
-        },
-      };
-      // Persist before submitting; retries use the same idempotency key after a lost response.
-      await storage.set("eventpass.pending-scan", JSON.stringify(entry));
-      setPending(entry);
-      const response = await request<Result>("/api/checkin", {
-        method: "POST",
-        body: entry.body,
-        deviceKey: deviceKey.trim(),
-      });
-      if (!response?.outcome)
-        throw new Error("Phản hồi không hợp lệ. Giữ lại lượt quét để thử lại.");
-      await storage.remove("eventpass.pending-scan");
-      setPending(null);
-      setResult(response);
-      setPayload("");
+      await task();
     } catch (error) {
       setError(messageOf(error));
     } finally {
@@ -131,80 +109,188 @@ export default function Checkin() {
       setBusy(false);
     }
   }
+  async function scan(value: string) {
+    if (!deviceKey.trim() || !value.trim() || lock.current) return;
+    setResult(undefined);
+    await act(async () => {
+      const response = await submitScan(
+        deviceKey.trim(),
+        value.trim(),
+        eventId.trim(),
+      );
+      setResult(response.scan);
+      setPayload("");
+      setHistory(await historyFor(deviceKey.trim()));
+      if (response.networkError) setError(response.networkError);
+    });
+  }
+  const pending = history.filter((scan) => scan.pending).length;
+  async function sync() {
+    await act(async () => {
+      const count = await syncScans(deviceKey.trim());
+      const scans = await historyFor(deviceKey.trim());
+      setHistory(scans);
+      setResult(scans[0]);
+      setNotice(`Đã đồng bộ ${count} lượt quét.`);
+    });
+  }
+  const syncRef = useRef(sync);
+  useEffect(() => {
+    syncRef.current = sync;
+  });
+  useEffect(() => {
+    if (
+      !autoSync ||
+      !focused ||
+      !foreground ||
+      !ready ||
+      network.isConnected === false ||
+      !deviceKey.trim() ||
+      pending === 0
+    )
+      return;
+    const timer = setInterval(() => {
+      void syncRef.current();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [
+    autoSync,
+    focused,
+    foreground,
+    ready,
+    deviceKey,
+    pending,
+    network.isConnected,
+  ]);
+  const visible = history.filter(
+    (scan) =>
+      filter === "all" ||
+      (filter === "pending"
+        ? scan.pending
+        : filter === "ACCEPTED"
+          ? scan.outcome === "ACCEPTED"
+          : scan.outcome !== "ACCEPTED"),
+  );
   return (
     <Screen>
       <Title>Soát vé sự kiện</Title>
+      <Badge>
+        {network.isConnected === false ? "NGOẠI TUYẾN" : "CÓ KẾT NỐI MẠNG"}
+      </Badge>
       <Body muted>
-        Dùng khóa thiết bị do ban tổ chức cấp. Lượt quét chỉ được chấp nhận sau
-        khi máy chủ xác nhận.
+        Dùng khóa thiết bị do ban tổ chức cấp. Khi mất mạng, kết quả kiểm tra
+        chữ ký là tạm thời; đồng bộ để máy chủ xác nhận.
       </Body>
+      <Feedback message={error} />
+      {!!notice && <Body>{notice}</Body>}
       <Card>
         <Field
           label="Khóa thiết bị"
           value={deviceKey}
-          onChangeText={setDeviceKey}
+          onChangeText={(value) => {
+            setDeviceKey(value);
+            setHistory([]);
+            setResult(undefined);
+          }}
           secureTextEntry
           autoCapitalize="none"
           editable={!busy}
         />
-        <Feedback message={error} />
-        {pending && (
-          <>
-            <Badge>CHỜ MÁY CHỦ XÁC NHẬN</Badge>
-            <Body muted>
-              Lượt quét được giữ lại. Thử lại bằng cùng khóa thiết bị để tránh
-              ghi nhận hai lần.
-            </Body>
-            <Button
-              title="Thử lại lượt quét"
-              busy={busy}
-              disabled={!deviceKey.trim()}
-              onPress={() => scan("")}
-            />
-          </>
-        )}
-        {!pending && (
-          <>
-            <Field
-              label="Nội dung mã QR"
-              value={payload}
-              onChangeText={setPayload}
-              multiline
-              autoCapitalize="none"
-              editable={!busy}
-            />
-            <Button
-              title="Kiểm tra vé"
-              busy={busy}
-              disabled={!ready || !deviceKey.trim() || !payload.trim()}
-              onPress={() => scan(payload)}
-            />
-            <Button
-              secondary
-              title={camera ? "Đóng camera" : "Quét mã bằng camera"}
-              disabled={!ready || busy || !deviceKey.trim()}
-              onPress={async () => {
-                if (camera) {
-                  setCamera(false);
-                  return;
-                }
-                try {
-                  const allowed =
-                    permission?.granted || (await requestPermission()).granted;
-                  if (allowed) setCamera(true);
-                  else
-                    setError(
-                      "Chưa có quyền camera. Cho phép camera trong cài đặt hoặc nhập nội dung QR.",
-                    );
-                } catch (error) {
-                  setError(messageOf(error));
-                }
-              }}
-            />
-          </>
-        )}
+        <Field
+          label="Mã sự kiện để kiểm tra offline"
+          value={eventId}
+          onChangeText={setEventId}
+          autoCapitalize="none"
+          editable={!busy}
+        />
+        <Body muted>
+          Nhập đúng mã sự kiện để tạm chấp nhận vé khi offline. Thiếu mã sự kiện
+          hoặc chứng thư sẽ cần chờ máy chủ.
+        </Body>
+        <Body muted>Chứng thư: {dateTime(certificateAt)}</Body>
+        <Button
+          secondary
+          title="Cập nhật chứng thư offline"
+          disabled={!ready}
+          busy={busy}
+          onPress={() =>
+            act(async () => {
+              setCertificateAt((await refreshCertificate()).updatedAt);
+              setNotice("Đã lưu chứng thư xác minh chữ ký QR.");
+            })
+          }
+        />
+        <Badge>CHỜ ĐỒNG BỘ: {pending}</Badge>
+        <Button
+          title="Đồng bộ lượt quét"
+          disabled={!ready || !deviceKey.trim() || pending === 0}
+          busy={busy}
+          onPress={sync}
+        />
+        <Button
+          secondary
+          title={autoSync ? "Tự đồng bộ: Bật" : "Tự đồng bộ: Tắt"}
+          disabled={busy}
+          onPress={() => setAutoSync(!autoSync)}
+        />
+        <Body muted>
+          Hàng đợi được lưu trên thiết bị, giữ nguyên mã idempotency khi thử
+          lại. Offline không kiểm tra được vé bị thu hồi hoặc lượt đã dùng trên
+          thiết bị khác.
+        </Body>
       </Card>
-      {camera && focused && foreground && permission?.granted && !pending && (
+      <Card>
+        <Button
+          secondary
+          title={
+            scannerInput ? "Chế độ máy quét Bluetooth / USB" : "Chế độ nhập tay"
+          }
+          disabled={busy}
+          onPress={() => setScannerInput(!scannerInput)}
+        />
+        <Field
+          label="Nội dung mã QR"
+          value={payload}
+          onChangeText={setPayload}
+          multiline={!scannerInput}
+          returnKeyType="done"
+          onSubmitEditing={() => {
+            void scan(payload);
+          }}
+          autoCapitalize="none"
+          editable={!busy}
+          maxLength={16384}
+        />
+        <Button
+          title="Kiểm tra vé"
+          busy={busy}
+          disabled={!ready || !deviceKey.trim() || !payload.trim()}
+          onPress={() => scan(payload)}
+        />
+        <Button
+          secondary
+          title={camera ? "Đóng camera" : "Quét mã bằng camera"}
+          disabled={!ready || busy || !deviceKey.trim()}
+          onPress={async () => {
+            if (camera) {
+              setCamera(false);
+              return;
+            }
+            try {
+              const allowed =
+                permission?.granted || (await requestPermission()).granted;
+              if (allowed) setCamera(true);
+              else
+                setError(
+                  "Chưa có quyền camera. Cho phép camera trong cài đặt hoặc nhập nội dung QR.",
+                );
+            } catch (error) {
+              setError(messageOf(error));
+            }
+          }}
+        />
+      </Card>
+      {camera && focused && foreground && permission?.granted && (
         <View style={{ height: 320, overflow: "hidden", borderRadius: 22 }}>
           <CameraView
             style={{ flex: 1 }}
@@ -219,14 +305,70 @@ export default function Checkin() {
       {result && (
         <Card>
           <Badge>
-            {result.outcome === "ACCEPTED" ? "VÉ HỢP LỆ" : "KHÔNG CHẤP NHẬN"}
+            {result.pending
+              ? "KẾT QUẢ OFFLINE · CHỜ ĐỒNG BỘ"
+              : "MÁY CHỦ ĐÃ XÁC NHẬN"}
           </Badge>
-          <Heading>{result.outcome}</Heading>
-          <Body>{result.detail}</Body>
+          <Heading>
+            {result.outcome === "ACCEPTED"
+              ? result.pending
+                ? "Chữ ký hợp lệ · Tạm chấp nhận"
+                : "VÉ HỢP LỆ"
+              : result.outcome === "PENDING"
+                ? "Chưa có chứng thư · Chưa cho vào"
+                : "KHÔNG CHẤP NHẬN"}
+          </Heading>
+          <Body>{result.outcome}</Body>
+          {!!result.detail && <Body>{result.detail}</Body>}
           {!!result.ticketId && <Body muted>Mã vé: {result.ticketId}</Body>}
           {!!result.entryNo && <Body>Lượt vào: {result.entryNo}</Body>}
-          <Body muted>{dateTime(result.serverReceivedAt)}</Body>
+          <Body muted>
+            {dateTime(result.serverReceivedAt || result.clientCheckinAt)}
+          </Body>
         </Card>
+      )}
+      <Heading>Lịch sử thiết bị ({history.length})</Heading>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {[
+          ["all", "Tất cả"],
+          ["ACCEPTED", "Cho vào"],
+          ["rejected", "Chưa cho vào"],
+          ["pending", "Chờ đồng bộ"],
+        ].map(([key, label]) => (
+          <Button
+            key={key}
+            title={label}
+            secondary={filter !== key}
+            onPress={() => {
+              setFilter(key);
+              setLimit(30);
+            }}
+          />
+        ))}
+      </View>
+      {visible.slice(0, limit).map((scan) => (
+        <Card key={scan.idempotencyKey}>
+          <Badge>{scan.pending ? "CHỜ ĐỒNG BỘ" : "ĐÃ ĐỒNG BỘ"}</Badge>
+          <Body>
+            {scan.outcome} · {scan.ticketId || "Không xác định vé"}
+          </Body>
+          <Body muted>{dateTime(scan.clientCheckinAt)}</Body>
+          {!!scan.localOutcome && scan.localOutcome !== scan.outcome && (
+            <Body>Kết quả cục bộ trước đó: {scan.localOutcome}</Body>
+          )}
+          <Button
+            secondary
+            title="Xem kết quả lượt quét"
+            onPress={() => setResult(scan)}
+          />
+        </Card>
+      ))}
+      {visible.length > limit && (
+        <Button
+          secondary
+          title="Xem thêm lịch sử"
+          onPress={() => setLimit(limit + 30)}
+        />
       )}
     </Screen>
   );

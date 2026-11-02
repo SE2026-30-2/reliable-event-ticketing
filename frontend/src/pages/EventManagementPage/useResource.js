@@ -8,11 +8,11 @@ export function useResource(loader, args, refresh = 0) {
   useEffect(() => {
     const controller = new AbortController();
     loader(...JSON.parse(argsKey), controller.signal).then((data) => {
-      if (!controller.signal.aborted) setResult({ key, data });
+      if (!controller.signal.aborted) setResult({ key, loader, data });
     }).catch((error) => {
-      if (!controller.signal.aborted) setResult({ key, error: managementError(error) });
+      if (!controller.signal.aborted) setResult({ key, loader, error: managementError(error) });
     });
     return () => controller.abort();
   }, [loader, argsKey, key]);
-  return result?.key === key ? { ...result, loading: false } : { loading: true };
+  return result?.key === key && result.loader === loader ? { ...result, loading: false } : { loading: true };
 }

@@ -33,6 +33,7 @@ async function setup(page, options = {}) {
     if (!item) return route.fulfill({ status: 404, json: { message: 'Không tồn tại' } });
     if (req.method() === 'PATCH') {
       if (options.failPatch) return route.fulfill({ status: 403, json: { message: 'Forbidden' } });
+      if (options.unconfirmed) return route.fulfill({ json: item });
       Object.assign(item, req.postDataJSON());
     }
     return route.fulfill({ json: item });
@@ -67,6 +68,14 @@ test('global filters, statistics, pagination and responsive layout', async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.screenshot({ path: 'tmp/screen16-mobile.png', fullPage: true });
+});
+
+test('an unchanged HTTP 200 response does not confirm a role or status mutation', async ({ page }) => {
+  await setup(page, { unconfirmed: true });
+  await action(page, 'Người dùng 3', 'Khóa tài khoản');
+  await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('chưa xác nhận đúng thay đổi tài khoản');
+  await expect(page.getByRole('dialog')).toBeVisible();
 });
 
 test('detail, granting and revoking organizer preserve other roles', async ({ page }) => {

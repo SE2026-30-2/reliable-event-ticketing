@@ -36,6 +36,9 @@ limits are shared across clients. Ticketing can be configured to trust
 `X-Forwarded-For`, but this is safe only when all access to that backend is
 restricted to trusted proxies that overwrite the header.
 
+For Vite development without Docker, copy `frontend/.env.example` to
+`frontend/.env` and adjust the API URLs locally. The `.env` file is ignored by Git.
+
 `VITE_USER_SERVICE_URL` and `VITE_TICKETING_SERVICE_URL` in the root `.env`
 default to `http://localhost:5173`, the public Nginx origin for local use. Vite
 embeds these values when the image is built, so rebuild the frontend after

@@ -28,7 +28,7 @@ function RefundDialog({ payment, api, close, complete, uncertain }) {
     lock.current = true; setBusy(true); setError('');
     try {
       const result = await api.refund(payment.paymentRequestId);
-      if (result.paymentRequestId !== payment.paymentRequestId || result.reservationId !== payment.reservationId || result.status !== 'REFUNDED') {
+      if (!result || result.paymentRequestId !== payment.paymentRequestId || result.reservationId !== payment.reservationId || result.status !== 'REFUNDED' || result.amountCents !== payment.amountCents || result.provider !== payment.provider) {
         throw new Error('unconfirmed');
       }
       complete(result);
@@ -51,6 +51,7 @@ function RefundDialog({ payment, api, close, complete, uncertain }) {
 function Workspace({ preview }) {
   const api = useMemo(() => preview ? createPreviewService() : adminPaymentService, [preview]);
   const [query, setQuery] = useState(preview ? previewPayment.reservationId : '');
+  const [lookupType, setLookupType] = useState('reservation');
   const [payment, setPayment] = useState(null), [loading, setLoading] = useState(false), [error, setError] = useState('');
   const [notice, setNotice] = useState(''), [modal, setModal] = useState(null), [needsLookup, setNeedsLookup] = useState(false);
   const controller = useRef(null), lookupLock = useRef(false);
@@ -65,7 +66,8 @@ function Workspace({ preview }) {
     controller.current = new AbortController();
     const signal = controller.current.signal;
     try {
-      const result = await api.lookup(id, signal);
+      const result = await api.lookup(id, signal, lookupType);
+      if (!result || !isUuid(result.paymentRequestId || '') || !isUuid(result.reservationId || '') || !Number.isSafeInteger(result.amountCents) || result.amountCents < 0 || typeof result.status !== 'string' || (lookupType === 'payment' ? result.paymentRequestId : result.reservationId)?.toLowerCase() !== id.toLowerCase()) throw new Error('Phản hồi tra cứu không khớp mã giao dịch.');
       if (!signal.aborted) { setPayment(result); setNeedsLookup(false); }
     } catch (failure) { if (!signal.aborted) setError(paymentError(failure)); }
     finally { lookupLock.current = false; if (!signal.aborted) setLoading(false); }
@@ -77,10 +79,10 @@ function Workspace({ preview }) {
         <section className="ad-heading"><div><h1>Quản trị giao dịch &amp; Hoàn tiền</h1><p>Tra cứu thông tin giao dịch, kiểm tra trạng thái thanh toán và thực hiện hoàn tiền khi cần thiết.</p></div></section>
         <section className="ap-panel" aria-labelledby="ap-search-title"><h2 id="ap-search-title"><Icon name="eye" />Tra cứu giao dịch</h2>
           <form onSubmit={lookup} aria-busy={loading}>
-            <fieldset className="ap-search-type" disabled={loading}><legend className="ap-sr-only">Loại mã tra cứu</legend><label><input type="radio" name="lookupType" value="reservation" defaultChecked />Tìm theo mã đặt chỗ (Reservation ID)</label><label title="Chưa có API tra cứu theo mã thanh toán"><input type="radio" name="lookupType" value="payment" disabled />Tìm theo mã thanh toán (Payment ID)</label></fieldset>
-            <label className="ap-sr-only" htmlFor="ap-query">Mã đặt chỗ</label><div className="ap-search-row"><div className="ap-input"><input id="ap-query" value={query} onChange={(e) => setQuery(e.target.value)} disabled={loading} placeholder="Nhập mã đặt chỗ (UUID)" autoComplete="off" spellCheck={false} aria-describedby="ap-search-help" /><button type="button" aria-label="Xóa mã tra cứu" disabled={loading || !query} onClick={() => { setQuery(''); setPayment(null); setError(''); setNotice(''); }}>×</button></div><button className="primary" disabled={loading} type="submit">{loading ? <><span className="em-spinner" />Đang tra cứu…</> : '⌕ Tra cứu'}</button></div>
+            <fieldset className="ap-search-type" disabled={loading}><legend className="ap-sr-only">Loại mã tra cứu</legend><label><input type="radio" name="lookupType" value="reservation" checked={lookupType === 'reservation'} onChange={() => { setLookupType('reservation'); setQuery(''); setPayment(null); setError(''); setNotice(''); setModal(null); setNeedsLookup(true); }} />Tìm theo mã đặt chỗ (Reservation ID)</label><label><input type="radio" name="lookupType" value="payment" checked={lookupType === 'payment'} onChange={() => { setLookupType('payment'); setQuery(''); setPayment(null); setError(''); setNotice(''); setModal(null); setNeedsLookup(true); }} />Tìm theo mã thanh toán (Payment ID)</label></fieldset>
+            <label className="ap-sr-only" htmlFor="ap-query">{lookupType === 'payment' ? 'Mã thanh toán' : 'Mã đặt chỗ'}</label><div className="ap-search-row"><div className="ap-input"><input id="ap-query" value={query} onChange={(e) => { setQuery(e.target.value); setPayment(null); setNotice(''); setError(''); setModal(null); setNeedsLookup(true); }} disabled={loading} placeholder={lookupType === 'payment' ? 'Nhập mã thanh toán (UUID)' : 'Nhập mã đặt chỗ (UUID)'} autoComplete="off" spellCheck={false} aria-describedby="ap-search-help" /><button type="button" aria-label="Xóa mã tra cứu" disabled={loading || !query} onClick={() => { setQuery(''); setPayment(null); setError(''); setNotice(''); }}>×</button></div><button className="primary" disabled={loading} type="submit">{loading ? <><span className="em-spinner" />Đang tra cứu…</> : '⌕ Tra cứu'}</button></div>
             <p className="ap-help" id="ap-search-help">Nhập chính xác mã đặt chỗ để xem thông tin giao dịch và trạng thái thanh toán.</p>
-            <details className="ap-api-note"><summary>Phạm vi tra cứu hiện có</summary><p>Hiện chỉ tra cứu bằng mã đặt chỗ của các đơn do tài khoản hiện tại đặt. Tra cứu theo mã thanh toán và tra cứu đơn của tài khoản khác chưa khả dụng.</p></details>
+            <details className="ap-api-note"><summary>Phạm vi tra cứu</summary><p>ADMIN có thể tra cứu đơn của mọi tài khoản bằng mã đặt chỗ hoặc mã thanh toán, gồm giao dịch VNPay, miễn phí và mock.</p></details>
           </form>
         </section>
         {loading && <p role="status" className="au-message">Đang tải thông tin giao dịch…</p>}

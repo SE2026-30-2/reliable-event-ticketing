@@ -164,9 +164,17 @@ export default function EventDetail() {
             Hạn giữ vé: {dateTime(reservation.tickets[0]?.reservationExpiresAt)}
           </Body>
           <Body muted>
-            Vé đang được giữ chỗ. Chức năng thanh toán trên mobile chưa được hỗ
-            trợ.
+            Hoàn tất thanh toán trước khi hết hạn giữ vé để nhận mã QR.
           </Body>
+          <Button
+            title="Tiếp tục thanh toán"
+            onPress={() =>
+              router.push({
+                pathname: "/checkout/[id]",
+                params: { id: reservation.reservationId },
+              })
+            }
+          />
           <Button
             title="Xem vé của tôi"
             onPress={() => router.push("/(tabs)/tickets")}

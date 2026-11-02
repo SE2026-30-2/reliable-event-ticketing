@@ -11,7 +11,7 @@ import {
   colors,
 } from "@/components/ui-kit";
 import { request } from "@/lib/api";
-import { useResource } from "@/hooks/use-resource";
+import { useLiveResource } from "@/hooks/use-live-resource";
 import { dateTime, messageOf } from "@/lib/types";
 
 interface Stats {
@@ -28,20 +28,22 @@ interface Bucket {
   rejected: number;
 }
 export function CheckinReport({ id }: { id: string }) {
-  const loadStats = useCallback(
-    (signal: AbortSignal) =>
-      request<Stats>(`/api/checkin/events/${id}/stats`, { signal }),
+  const loadLive = useCallback(
+    async (signal: AbortSignal) => {
+      const [stats, timeline] = await Promise.all([
+        request<Stats>(`/api/checkin/events/${id}/stats`, { signal }),
+        request<Bucket[]>(
+          `/api/checkin/events/${id}/timeline?bucketMinutes=15`,
+          { signal },
+        ),
+      ]);
+      return { stats, timeline, updatedAt: new Date().toISOString() };
+    },
     [id],
   );
-  const loadTimeline = useCallback(
-    (signal: AbortSignal) =>
-      request<Bucket[]>(`/api/checkin/events/${id}/timeline?bucketMinutes=15`, {
-        signal,
-      }),
-    [id],
-  );
-  const stats = useResource(loadStats);
-  const timeline = useResource(loadTimeline);
+  const live = useLiveResource(loadLive);
+  const stats = { ...live, data: live.data?.stats };
+  const timeline = { ...live, data: live.data?.timeline };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function exportCsv(kind: "attendees" | "payments") {
@@ -74,6 +76,10 @@ export function CheckinReport({ id }: { id: string }) {
   );
   return (
     <>
+      <Body muted>
+        Tự cập nhật mỗi 5 giây · Lần cuối: {dateTime(live.data?.updatedAt)}
+      </Body>
+      <Button secondary title="Làm mới báo cáo soát vé" onPress={live.reload} />
       <Card>
         <Heading>Thống kê soát vé</Heading>
         <Feedback message={stats.error} retry={stats.reload} />

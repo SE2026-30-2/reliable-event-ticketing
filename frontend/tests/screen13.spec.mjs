@@ -106,3 +106,61 @@ test('server exhaustion is remembered offline and camera failure offers a fallba
   await expect(page.getByRole('alert')).toContainText('Chưa được cấp quyền camera');
   await page.screenshot({ path: 'tmp/screen13-camera.png', fullPage: true });
 });
+
+test('an incomplete server acknowledgement remains pending and retries with the same idempotency key', async ({ page, context }) => {
+  const requests = await setup(page, context);
+  let original;
+  await context.route('http://localhost:8091/api/checkin', async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204 });
+    original = route.request().postDataJSON();
+    return route.fulfill({ json: { outcome: 'ACCEPTED' } });
+  });
+  await scan(page, await ticket());
+  await expect(page.getByText('1 lượt chờ đồng bộ')).toBeVisible();
+  await expect(page.getByText('Tại thiết bị · Chờ đồng bộ', { exact: true })).toBeVisible();
+  await expect(page.getByText('Máy chủ đã xác nhận', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Đồng bộ', exact: true }).click();
+  await expect(page.getByText('0 lượt chờ đồng bộ')).toBeVisible();
+  const batch = requests.find((item) => item.path.endsWith('/batch'));
+  expect(batch.body).toEqual([original]);
+});
+
+test('a storage failure after server acceptance clears the old verdict and preserves the pending attempt', async ({ page, context }) => {
+  await setup(page, context);
+  await scan(page, await ticket());
+  await expect(page.getByRole('heading', { name: 'CHO VÀO', exact: true })).toBeVisible();
+  await context.route('http://localhost:8091/api/checkin', async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204 });
+    const body = route.request().postDataJSON();
+    const claims = JSON.parse(Buffer.from(body.qrPayload.split('.')[1], 'base64url'));
+    await page.evaluate(() => {
+      const original = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function(value, ...args) {
+        if (this.name === 'scans' && value.pending === false) throw new DOMException('Storage acknowledgement failed', 'QuotaExceededError');
+        return original.call(this, value, ...args);
+      };
+    });
+    return route.fulfill({ json: { ticketId: claims.tid, outcome: 'ACCEPTED', entryNo: 1, serverReceivedAt: new Date().toISOString() } });
+  });
+  await scan(page, await ticket());
+  await expect(page.getByText('Không thể soát vé: Storage acknowledgement failed')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'CHO VÀO', exact: true })).toHaveCount(0);
+  await expect(page.getByText('1 lượt chờ đồng bộ')).toBeVisible();
+});
+
+test('an invalid batch item does not partially acknowledge the rest of the batch', async ({ page, context }) => {
+  await setup(page, context);
+  await context.setOffline(true);
+  await scan(page, await ticket());
+  await expect(page.getByText('1 lượt chờ đồng bộ')).toBeVisible();
+  await scan(page, await ticket());
+  await expect(page.getByText('2 lượt chờ đồng bộ')).toBeVisible();
+  await context.route('http://localhost:8091/api/checkin/batch', (route) => {
+    const body = route.request().postDataJSON();
+    const claims = JSON.parse(Buffer.from(body[0].qrPayload.split('.')[1], 'base64url'));
+    return route.fulfill({ json: [{ ticketId: claims.tid, outcome: 'ACCEPTED', entryNo: 1, serverReceivedAt: new Date().toISOString() }, {}] });
+  });
+  await context.setOffline(false);
+  await expect(page.locator('.ci-message')).toContainText('Phản hồi soát vé không hợp lệ. Lượt quét vẫn được giữ để thử lại.');
+  await expect(page.getByText('2 lượt chờ đồng bộ')).toBeVisible();
+});

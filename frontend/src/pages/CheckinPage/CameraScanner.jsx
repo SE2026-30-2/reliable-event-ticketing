@@ -17,7 +17,9 @@ export default function CameraScanner({ onScan, disabled }) {
         video.current.srcObject = media;
         await video.current.play();
         let detector;
-        if ('BarcodeDetector' in window && (await window.BarcodeDetector.getSupportedFormats()).includes('qr_code')) detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        try {
+          if ('BarcodeDetector' in window && (await window.BarcodeDetector.getSupportedFormats()).includes('qr_code')) detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        } catch { /* Continue with jsQR when the optional native detector is unavailable. */ }
         async function frame() {
           if (cancelled) return;
           try {

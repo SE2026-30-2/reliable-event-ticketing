@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createPreviewService } from '../src/pages/EventManagementPage/previewService.js';
 
-async function setup(page) {
+async function setup(page, options = {}) {
   const api = createPreviewService(), requests = [];
   await page.addInitScript(() => {
     localStorage.setItem('access_token', 'test-access-token');
@@ -16,6 +16,7 @@ async function setup(page) {
       if (url.pathname === '/api/event/e1') {
         data = method === 'PATCH' ? await api.update('e1', body) : (await api.workspace()).event;
         data.eventId = 'e1';
+        if (options.status) data.status = options.status;
       } else if (url.pathname.endsWith('/report')) data = (await api.workspace()).report;
       else if (url.pathname.endsWith('/ticket-types')) data = method === 'POST' ? await api.createTicketType('e1', body) : await api.ticketTypes();
       else if (url.pathname.endsWith('/coupons')) data = method === 'POST' ? await api.createCoupon('e1', body) : await api.coupons();
@@ -23,7 +24,10 @@ async function setup(page) {
       else if (url.pathname.endsWith('/guests')) data = await api.inviteGuests('e1', body);
       else if (url.pathname.endsWith('/tickets')) { data = await api.tickets('e1', Number(url.searchParams.get('page'))); data.content = data.content.map((t) => ({ ...t, qrPayload: 'SENSITIVE-QR-MUST-NOT-RENDER' })); }
       else if (url.pathname.endsWith('/status')) data = await api.updateTicketStatus(url.pathname.split('/')[3], body);
-      else if (url.pathname === '/api/checkin/devices') data = method === 'POST' ? await api.createDevice(body.eventId, body.label) : await api.devices();
+      else if (url.pathname === '/api/checkin/devices') {
+        data = method === 'POST' ? await api.createDevice(body.eventId, body.label) : await api.devices();
+        if (method === 'POST' && options.missingKey) delete data.apiKey;
+      }
       else if (url.pathname.endsWith('/revoke')) data = await api.revokeDevice(url.pathname.split('/')[4]);
       else if (url.pathname.endsWith('/stats')) data = (await api.live()).stats;
       else if (url.pathname.endsWith('/timeline')) data = (await api.live()).timeline;
@@ -78,7 +82,7 @@ test('cancel requires confirmation and disables further editing', async ({ page 
   await page.getByRole('button', { name: 'Hủy sự kiện', exact: true }).click();
   await page.getByRole('button', { name: 'Xác nhận hủy sự kiện' }).click();
   await expect(page.getByText('Đã hủy sự kiện.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Chỉnh sửa', exact: true })).toBeDisabled();
+  for (const button of await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).all()) await expect(button).toBeDisabled();
 });
 
 test('create ticket type converts VND to cents and preserves bundle fields', async ({ page }) => {
@@ -271,4 +275,25 @@ test('unknown guest issuance outcome does not claim all tickets failed', async (
   await page.getByRole('button', { name: 'Phát vé mời', exact: true }).click();
   await expect(page.getByText('Chưa xác nhận được kết quả phát vé.', { exact: false })).toBeVisible();
   await expect(page.getByText('Thất bại: 1 vé.', { exact: false })).toHaveCount(0);
+});
+
+test('missing device key is reported instead of silently losing the new credential', async ({ page }) => {
+  await setup(page, { missingKey: true });
+  await page.getByRole('button', { name: 'Thiết bị', exact: true }).click();
+  await page.getByLabel('Tên thiết bị', { exact: true }).fill('Gate without returned key');
+  await page.getByRole('button', { name: 'Tạo thiết bị', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Máy chủ chưa trả khóa thiết bị');
+  await expect(page.getByRole('dialog', { name: 'Lưu khóa thiết bị' })).toHaveCount(0);
+  await expect(page.getByText('Gate without returned key', { exact: true })).toBeVisible();
+});
+
+test('completed events do not offer editing, ticket type creation or coupon creation', async ({ page }) => {
+  await setup(page, { status: 'COMPLETED' });
+  const editButtons = page.getByRole('button', { name: 'Chỉnh sửa', exact: true });
+  await expect(editButtons).toHaveCount(2);
+  for (const button of await editButtons.all()) await expect(button).toBeDisabled();
+  await page.getByRole('button', { name: 'Loại vé', exact: true }).click();
+  await expect(page.getByRole('button', { name: '+ Tạo loại vé', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Mã giảm giá', exact: true }).click();
+  await expect(page.getByRole('button', { name: '+ Tạo mã giảm giá', exact: true })).toBeDisabled();
 });

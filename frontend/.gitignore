@@ -67,6 +67,7 @@ dist-ssr
 !/tests/authService.test.mjs
 !/tests/screen13.spec.mjs
 !/tests/screen13.test.mjs
+!/tests/screen14.spec.mjs
 !/tests/screen15.spec.mjs
 !/tests/screen15.test.mjs
 !/tests/screen16.spec.mjs

@@ -88,6 +88,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/admin/payments/**").hasRole("ADMIN")
                         // Management: ADMIN (everything) or ORGANIZER (only events they created - the
                         // per-event rule is EventAccessPort, applied in each controller/use case).
                         .requestMatchers(HttpMethod.POST, "/api/event").hasAnyRole("ADMIN", "ORGANIZER")

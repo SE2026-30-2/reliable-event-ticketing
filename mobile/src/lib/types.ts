@@ -6,6 +6,7 @@ export interface User {
   status: string;
   emailVerified: boolean;
   createdAt: string;
+  failedLoginAttempts?: number;
 }
 export interface Event {
   eventId: string;
@@ -66,6 +67,18 @@ export interface Reservation {
   totalCents: number;
   discountCents: number;
 }
+export interface Payment {
+  paymentRequestId: string;
+  reservationId: string;
+  amountCents: number;
+  status: string;
+  createdAt: string;
+  completedAt?: string;
+  provider: string;
+  txnRef?: string;
+  paymentUrl?: string;
+  failureReason?: string;
+}
 export interface Device {
   deviceId: string;
   label: string;
@@ -73,6 +86,8 @@ export interface Device {
   status: string;
   createdAt: string;
   apiKey?: string;
+  lastSeenAt?: string;
+  revokedAt?: string;
 }
 export interface Coupon {
   couponId: string;
@@ -81,6 +96,10 @@ export interface Coupon {
   value: number;
   active: boolean;
   redeemedCount: number;
+  ticketTypeId?: string;
+  maxRedemptions?: number;
+  validFrom?: string;
+  validUntil?: string;
 }
 export const money = (cents: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(

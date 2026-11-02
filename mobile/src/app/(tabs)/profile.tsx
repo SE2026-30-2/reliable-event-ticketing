@@ -68,6 +68,13 @@ function ProfileContent() {
           />
         )}
       </Card>
+      {!user?.emailVerified && (
+        <Button
+          secondary
+          title="Nhập token xác minh email"
+          onPress={() => router.push("/verify-email")}
+        />
+      )}
       <Button
         secondary
         title="Soát vé sự kiện"

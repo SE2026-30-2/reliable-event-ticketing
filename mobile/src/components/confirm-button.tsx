@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Body, Button, Card } from "@/components/ui-kit";
 export function ConfirmButton({
   title,
@@ -13,6 +13,7 @@ export function ConfirmButton({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
   if (!confirming)
     return (
       <Button
@@ -29,11 +30,15 @@ export function ConfirmButton({
         danger
         title={`Xác nhận ${title.toLowerCase()}`}
         busy={busy}
+        disabled={disabled}
         onPress={async () => {
+          if (disabled || lock.current) return;
+          lock.current = true;
           setBusy(true);
           try {
             await onConfirm();
           } finally {
+            lock.current = false;
             setBusy(false);
             setConfirming(false);
           }

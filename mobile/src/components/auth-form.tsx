@@ -79,7 +79,9 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
             <Body>Kiểm tra hộp thư để xác minh email trước khi đặt vé.</Body>
             <Button
               title="Đăng nhập"
-              onPress={() => router.replace("/login")}
+              onPress={() =>
+                router.replace({ pathname: "/login", params: { eventId } })
+              }
             />
           </>
         ) : (
@@ -127,6 +129,18 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
               busy={busy}
               onPress={submit}
             />
+            {!register && (
+              <Button
+                secondary
+                title="Quên mật khẩu"
+                onPress={() => router.push("/forgot-password")}
+              />
+            )}
+            <Button
+              secondary
+              title="Xác minh email"
+              onPress={() => router.push("/verify-email")}
+            />
             <Button
               secondary
               title={
@@ -134,7 +148,12 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
                   ? "Đã có tài khoản? Đăng nhập"
                   : "Chưa có tài khoản? Đăng ký"
               }
-              onPress={() => router.replace(register ? "/login" : "/register")}
+              onPress={() =>
+                router.replace({
+                  pathname: register ? "/login" : "/register",
+                  params: { eventId },
+                })
+              }
             />
           </>
         )}

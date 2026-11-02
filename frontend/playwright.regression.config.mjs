@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /(?:auth-login|navigation|permissions|screen15|screen16|screen17|screen18)\.spec\.mjs/,
+  testMatch: /(?:auth-login|navigation|permissions|screen14|screen15|screen16|screen17|screen18)\.spec\.mjs/,
   workers: 2, timeout: 30000,
   outputDir: 'tmp/regression-results',
   reporter: [['list'], ['json', { outputFile: 'tmp/regression-results.json' }]],

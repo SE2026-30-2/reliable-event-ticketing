@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { ScrollView, View } from "react-native";
 import {
@@ -18,6 +18,7 @@ import {
 import { EventForm } from "@/components/event-form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { CheckinReport } from "@/components/checkin-report";
+import { DeviceKey } from "@/components/device-key";
 import { useResource } from "@/hooks/use-resource";
 import { patch, post, request } from "@/lib/api";
 import {
@@ -47,6 +48,19 @@ const tabs = {
 type Tab = keyof typeof tabs;
 interface Report {
   generatedAt: string;
+  ticketTypes?: {
+    ticketTypeId: string;
+    name: string;
+    quota: number;
+    issued: number;
+    reserved: number;
+    remaining: number;
+    guests: number;
+    checkedIn: number;
+    refunded: number;
+    voided: number;
+    revenueCents: number;
+  }[];
   totals: {
     ticketsIssued: number;
     checkedIn: number;
@@ -54,14 +68,22 @@ interface Report {
     netRevenueCents: number;
     collectedCents: number;
     refundedCents: number;
+    couponDiscountCents?: number;
   };
 }
 function ManagementContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>("overview");
   const load = useCallback(
-    (signal: AbortSignal) =>
-      request<Event>(`/api/event/${encodeURIComponent(id)}`, { signal }),
+    async (signal: AbortSignal) => {
+      const [event] = await Promise.all([
+        request<Event>(`/api/event/${encodeURIComponent(id)}`, { signal }),
+        request<Report>(`/api/manage/events/${encodeURIComponent(id)}/report`, {
+          signal,
+        }),
+      ]);
+      return event;
+    },
     [id],
   );
   const resource = useResource(load);
@@ -147,6 +169,14 @@ function ManagementPanel({
   const resource = useResource<
     Report | TicketType[] | Coupon[] | Page<Ticket> | Device[]
   >(load);
+  const loadCouponTypes = useCallback(
+    (signal: AbortSignal) =>
+      tab === "coupons"
+        ? request<TicketType[]>(`/api/event/${id}/ticket-types`, { signal })
+        : Promise.resolve([]),
+    [id, tab],
+  );
+  const couponTypes = useResource(loadCouponTypes);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -163,10 +193,22 @@ function ManagementPanel({
   const [label, setLabel] = useState("");
   const [deviceKey, setDeviceKey] = useState("");
   const [reason, setReason] = useState("");
+  const [typeStart, setTypeStart] = useState(event.startsAt);
+  const [typeEnd, setTypeEnd] = useState(event.endsAt);
+  const [couponTypeId, setCouponTypeId] = useState("");
+  const [maxRedemptions, setMaxRedemptions] = useState("");
+  const [couponStart, setCouponStart] = useState("");
+  const [couponEnd, setCouponEnd] = useState("");
+  const [guestBatch, setGuestBatch] = useState("");
+  const [batchMode, setBatchMode] = useState(false);
+  const lock = useRef(false);
+  const final = ["CANCELLED", "COMPLETED"].includes(event.status);
   async function mutate(
     task: () => Promise<unknown>,
     success = "Đã lưu thay đổi.",
   ) {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -177,10 +219,12 @@ function ManagementPanel({
     } catch (error) {
       setError(messageOf(error));
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
   function createType() {
+    if (final || lock.current) return;
     if (
       !name.trim() ||
       price.trim() === "" ||
@@ -193,7 +237,11 @@ function ManagementPanel({
       Number(bundle) > 20 ||
       !Number.isInteger(Number(entries)) ||
       Number(entries) < 1 ||
-      Number(entries) > 50
+      Number(entries) > 50 ||
+      !Number.isSafeInteger(Math.round(Number(price) * 100)) ||
+      !Number.isFinite(Date.parse(typeStart)) ||
+      !Number.isFinite(Date.parse(typeEnd)) ||
+      Date.parse(typeEnd) <= Date.parse(typeStart)
     ) {
       setError("Nhập tên vé, giá VNĐ không âm, hạn ngạch và số lượt hợp lệ.");
       return;
@@ -203,20 +251,31 @@ function ManagementPanel({
         name: name.trim(),
         priceCents: Math.round(Number(price) * 100),
         quota: Number(quota),
-        validFrom: event.startsAt,
-        validUntil: event.endsAt,
+        validFrom: new Date(typeStart).toISOString(),
+        validUntil: new Date(typeEnd).toISOString(),
         maxEntries: Number(entries),
         bundleSize: Number(bundle),
       }),
     );
   }
-  if (resource.loading) return <Loading />;
+  if (resource.loading)
+    return (
+      <>
+        {deviceKey && (
+          <DeviceKey value={deviceKey} onClose={() => setDeviceKey("")} />
+        )}
+        <Loading />
+      </>
+    );
   const data = resource.data;
   return (
     <>
       <Feedback message={resource.error} retry={resource.reload} />
       <Feedback message={error} />
       {!!notice && <Body>{notice}</Body>}
+      {!!deviceKey && (
+        <DeviceKey value={deviceKey} onClose={() => setDeviceKey("")} />
+      )}
       {!resource.error && data && (
         <>
           {tab === "overview" && (
@@ -237,6 +296,26 @@ function ManagementPanel({
               <Heading>
                 Doanh thu: {money((data as Report).totals.netRevenueCents)}
               </Heading>
+              <Body>
+                Giảm giá coupon:{" "}
+                {money((data as Report).totals.couponDiscountCents || 0)}
+              </Body>
+              {(data as Report).ticketTypes?.map((line) => (
+                <Card key={line.ticketTypeId}>
+                  <Heading>{line.name}</Heading>
+                  <Body>
+                    Phát hành {line.issued} · Giữ chỗ {line.reserved} · Còn{" "}
+                    {line.remaining} / {line.quota}
+                  </Body>
+                  <Body>
+                    Vé mời {line.guests} · Đã tham dự {line.checkedIn}
+                  </Body>
+                  <Body>
+                    Hoàn {line.refunded} · Hủy {line.voided}
+                  </Body>
+                  <Body>Tiền thu: {money(line.revenueCents)}</Body>
+                </Card>
+              ))}
               <Button
                 secondary
                 title="Mở soát vé"
@@ -287,10 +366,26 @@ function ManagementPanel({
                   onChangeText={setEntries}
                   keyboardType="number-pad"
                 />
-                <Body muted>
-                  Vé có hiệu lực theo thời gian bắt đầu và kết thúc sự kiện.
-                </Body>
-                <Button title="Tạo loại vé" busy={busy} onPress={createType} />
+                <Field
+                  label="Hiệu lực vé từ (kèm múi giờ)"
+                  value={typeStart}
+                  onChangeText={setTypeStart}
+                  editable={!busy && !final}
+                  autoCapitalize="none"
+                />
+                <Field
+                  label="Hiệu lực vé đến (kèm múi giờ)"
+                  value={typeEnd}
+                  onChangeText={setTypeEnd}
+                  editable={!busy && !final}
+                  autoCapitalize="none"
+                />
+                <Button
+                  title="Tạo loại vé"
+                  busy={busy}
+                  disabled={final}
+                  onPress={createType}
+                />
               </Card>
             </>
           )}
@@ -307,10 +402,23 @@ function ManagementPanel({
                       : money(coupon.value)}{" "}
                     · Đã dùng {coupon.redeemedCount} lượt
                   </Body>
+                  <Body muted>
+                    Giới hạn: {coupon.maxRedemptions ?? "Không giới hạn"} · Loại
+                    vé:{" "}
+                    {coupon.ticketTypeId
+                      ? couponTypes.data?.find(
+                          (type) => type.ticketTypeId === coupon.ticketTypeId,
+                        )?.name || coupon.ticketTypeId
+                      : "Tất cả"}
+                  </Body>
+                  <Body muted>
+                    Hiệu lực: {dateTime(coupon.validFrom)} →{" "}
+                    {dateTime(coupon.validUntil)}
+                  </Body>
                   <Button
                     secondary
                     title={coupon.active ? "Tắt ưu đãi" : "Bật ưu đãi"}
-                    disabled={busy}
+                    disabled={busy || final}
                     onPress={() =>
                       mutate(() =>
                         patch(
@@ -348,28 +456,94 @@ function ManagementPanel({
                   onChangeText={setValue}
                   keyboardType="numeric"
                 />
+                <Feedback
+                  message={couponTypes.error}
+                  retry={couponTypes.reload}
+                />
+                <Button
+                  secondary
+                  title="Áp dụng tất cả loại vé"
+                  disabled={busy || final}
+                  onPress={() => setCouponTypeId("")}
+                />
+                {couponTypes.data?.map((type) => (
+                  <Button
+                    key={type.ticketTypeId}
+                    secondary={couponTypeId !== type.ticketTypeId}
+                    title={`Áp dụng: ${type.name}`}
+                    disabled={busy || final}
+                    onPress={() => setCouponTypeId(type.ticketTypeId)}
+                  />
+                ))}
+                <Field
+                  label="Số lượt dùng tối đa (để trống nếu không giới hạn)"
+                  value={maxRedemptions}
+                  onChangeText={setMaxRedemptions}
+                  keyboardType="number-pad"
+                  editable={!busy && !final}
+                />
+                <Field
+                  label="Coupon hiệu lực từ (tùy chọn, kèm múi giờ)"
+                  value={couponStart}
+                  onChangeText={setCouponStart}
+                  editable={!busy && !final}
+                  autoCapitalize="none"
+                />
+                <Field
+                  label="Coupon hiệu lực đến (tùy chọn, kèm múi giờ)"
+                  value={couponEnd}
+                  onChangeText={setCouponEnd}
+                  editable={!busy && !final}
+                  autoCapitalize="none"
+                />
                 <Button
                   title="Tạo mã"
                   busy={busy}
+                  disabled={final}
                   onPress={() => {
+                    if (final || lock.current) return;
                     if (
-                      !code.trim() ||
+                      !/^[A-Z0-9_-]{3,40}$/.test(code.trim().toUpperCase()) ||
                       !Number.isFinite(Number(value)) ||
                       Number(value) <= 0 ||
                       (percent &&
                         (!Number.isInteger(Number(value)) ||
-                          Number(value) > 100))
+                          Number(value) > 100)) ||
+                      (!percent &&
+                        !Number.isSafeInteger(
+                          Math.round(Number(value) * 100),
+                        )) ||
+                      (!!maxRedemptions.trim() &&
+                        (!Number.isInteger(Number(maxRedemptions)) ||
+                          Number(maxRedemptions) < 1)) ||
+                      (!!couponStart &&
+                        !Number.isFinite(Date.parse(couponStart))) ||
+                      (!!couponEnd &&
+                        !Number.isFinite(Date.parse(couponEnd))) ||
+                      (!!couponStart &&
+                        !!couponEnd &&
+                        Date.parse(couponEnd) <= Date.parse(couponStart))
                     ) {
                       setError("Nhập mã và giá trị giảm hợp lệ.");
                       return;
                     }
                     void mutate(() =>
                       post(`/api/manage/events/${id}/coupons`, {
-                        code: code.trim(),
+                        code: code.trim().toUpperCase(),
                         type: percent ? "PERCENT" : "FIXED",
                         value: percent
                           ? Number(value)
                           : Math.round(Number(value) * 100),
+                        ticketTypeId: couponTypeId || undefined,
+                        maxRedemptions: maxRedemptions.trim()
+                          ? Number(maxRedemptions)
+                          : undefined,
+                        validFrom: couponStart
+                          ? new Date(couponStart).toISOString()
+                          : undefined,
+                        validUntil: couponEnd
+                          ? new Date(couponEnd).toISOString()
+                          : undefined,
                       }),
                     );
                   }}
@@ -380,6 +554,12 @@ function ManagementPanel({
           {tab === "guests" && (
             <Card>
               <Heading>Mời khách tham dự</Heading>
+              <Button
+                secondary
+                title={batchMode ? "Nhập một khách" : "Nhập danh sách khách"}
+                disabled={busy || final}
+                onPress={() => setBatchMode(!batchMode)}
+              />
               <Body muted>Chọn loại vé để cấp vé mời qua email.</Body>
               {(data as TicketType[]).map((type) => (
                 <Button
@@ -387,21 +567,65 @@ function ManagementPanel({
                   secondary={typeId !== type.ticketTypeId}
                   title={type.name}
                   onPress={() => setTypeId(type.ticketTypeId)}
+                  disabled={busy || final}
                 />
               ))}
-              <Field label="Họ tên khách" value={name} onChangeText={setName} />
-              <Field
-                label="Email khách"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
+              {batchMode ? (
+                <Field
+                  label="Danh sách khách (mỗi dòng: Họ tên, email)"
+                  value={guestBatch}
+                  onChangeText={setGuestBatch}
+                  multiline
+                  editable={!busy && !final}
+                />
+              ) : (
+                <>
+                  <Field
+                    label="Họ tên khách"
+                    value={name}
+                    onChangeText={setName}
+                    editable={!busy && !final}
+                  />
+                  <Field
+                    label="Email khách"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    editable={!busy && !final}
+                  />
+                </>
+              )}
               <Button
                 title="Gửi vé mời"
                 busy={busy}
+                disabled={final}
                 onPress={() => {
-                  if (!typeId || !name.trim() || !isEmail(email)) {
+                  if (final || lock.current) return;
+                  const lines = guestBatch
+                    .split(/\r?\n/)
+                    .map((line) => line.trim())
+                    .filter(Boolean);
+                  const guests = batchMode
+                    ? lines.map((line) => {
+                        const split = line.lastIndexOf(",");
+                        return {
+                          name: split > 0 ? line.slice(0, split).trim() : "",
+                          email: line.slice(split + 1).trim(),
+                        };
+                      })
+                    : [{ name: name.trim(), email: email.trim() }];
+                  if (
+                    !typeId ||
+                    guests.length < 1 ||
+                    guests.length > 200 ||
+                    guests.some(
+                      (guest) =>
+                        !guest.name ||
+                        guest.name.length > 255 ||
+                        !isEmail(guest.email),
+                    )
+                  ) {
                     setError("Chọn loại vé và nhập đầy đủ tên, email hợp lệ.");
                     return;
                   }
@@ -409,7 +633,7 @@ function ManagementPanel({
                     () =>
                       post(`/api/manage/events/${id}/guests`, {
                         ticketTypeId: typeId,
-                        guests: [{ name: name.trim(), email: email.trim() }],
+                        guests,
                       }),
                     "Đã gửi vé mời.",
                   );
@@ -436,12 +660,14 @@ function ManagementPanel({
                       disabled={busy || !reason.trim()}
                       description={`Vô hiệu hóa vé của ${ticket.holderName}? Lý do: ${reason}`}
                       onConfirm={() =>
-                        mutate(() =>
-                          patch(`/api/ticket/${ticket.ticketId}/status`, {
-                            status: "VOID",
-                            reason: reason.trim(),
-                          }),
-                        )
+                        !reason.trim()
+                          ? Promise.resolve()
+                          : mutate(() =>
+                              patch(`/api/ticket/${ticket.ticketId}/status`, {
+                                status: "VOID",
+                                reason: reason.trim(),
+                              }),
+                            )
                       }
                     />
                   )}
@@ -497,28 +723,21 @@ function ManagementPanel({
                 <Button
                   title="Tạo thiết bị"
                   busy={busy}
-                  disabled={!label.trim()}
+                  disabled={!label.trim() || !!deviceKey}
                   onPress={() =>
                     mutate(async () => {
                       const result = await post<Device>(
                         "/api/checkin/devices",
                         { eventId: id, label: label.trim() },
                       );
-                      setDeviceKey(result.apiKey || "");
+                      if (!result.apiKey)
+                        throw new Error(
+                          "Thiết bị đã tạo nhưng thiếu khóa. Hãy thu hồi và tạo lại.",
+                        );
+                      setDeviceKey(result.apiKey);
                     })
                   }
                 />
-                {!!deviceKey && (
-                  <>
-                    <Body>Khóa thiết bị (chỉ hiển thị lần này):</Body>
-                    <Body>{deviceKey}</Body>
-                    <Button
-                      secondary
-                      title="Ẩn khóa"
-                      onPress={() => setDeviceKey("")}
-                    />
-                  </>
-                )}
               </Card>
             </>
           )}

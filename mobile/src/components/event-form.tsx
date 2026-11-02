@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ConfirmButton } from "./confirm-button";
+import { eventStatuses } from "@/lib/management";
 import {
   Badge,
   Button,
@@ -26,8 +28,16 @@ export function EventForm({
   const [status, setStatus] = useState(event?.status || "DRAFT");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const lock = useRef(false);
+  const final = !!event && ["CANCELLED", "COMPLETED"].includes(event.status);
+  const statuses = eventStatuses(event);
   async function save() {
+    if (lock.current || final) return;
     setError("");
+    if (!statuses.includes(status)) {
+      setError("Không thể chuyển trạng thái sự kiện như đã chọn.");
+      return;
+    }
     const start = Date.parse(starts),
       end = Date.parse(ends);
     if (
@@ -35,6 +45,8 @@ export function EventForm({
       !Number.isFinite(start) ||
       !Number.isFinite(end) ||
       end <= start ||
+      // This check runs only in the submit/confirmation handler.
+      // eslint-disable-next-line react-hooks/purity
       (!event && start <= Date.now())
     ) {
       setError(
@@ -46,6 +58,7 @@ export function EventForm({
       setError("Ảnh bìa phải là địa chỉ http hoặc https.");
       return;
     }
+    lock.current = true;
     setBusy(true);
     const body = {
       name: name.trim(),
@@ -63,6 +76,7 @@ export function EventForm({
     } catch (error) {
       setError(messageOf(error));
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
@@ -70,33 +84,41 @@ export function EventForm({
     <Card>
       <Heading>{event ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}</Heading>
       <Feedback message={error} />
+      {final && (
+        <Heading>Sự kiện đã kết thúc hoặc bị hủy, không thể chỉnh sửa.</Heading>
+      )}
       <Field
         label="Tên sự kiện"
         value={name}
         onChangeText={setName}
         maxLength={255}
+        editable={!busy && !final}
       />
       <Field
         label="Địa điểm"
         value={venue}
         onChangeText={setVenue}
         maxLength={255}
+        editable={!busy && !final}
       />
       <Field
         label="Bắt đầu (VD: 2026-12-20T19:00:00+07:00)"
         value={starts}
+        editable={!busy && !final}
         onChangeText={setStarts}
         autoCapitalize="none"
       />
       <Field
         label="Kết thúc (kèm múi giờ +07:00)"
         value={ends}
+        editable={!busy && !final}
         onChangeText={setEnds}
         autoCapitalize="none"
       />
       <Field
         label="Mô tả"
         value={description}
+        editable={!busy && !final}
         onChangeText={setDescription}
         multiline
         maxLength={5000}
@@ -104,12 +126,13 @@ export function EventForm({
       <Field
         label="URL ảnh bìa"
         value={banner}
+        editable={!busy && !final}
         onChangeText={setBanner}
         autoCapitalize="none"
         maxLength={500}
       />
       <Badge>{status}</Badge>
-      {["DRAFT", "PUBLISHED", ...(event ? ["CANCELLED"] : [])].map((value) => (
+      {statuses.map((value) => (
         <Button
           key={value}
           secondary={status !== value}
@@ -119,10 +142,31 @@ export function EventForm({
             ] || value
           }
           onPress={() => setStatus(value)}
-          disabled={busy}
+          disabled={busy || final}
         />
       ))}
-      <Button title="Lưu sự kiện" busy={busy} onPress={save} />
+      {event && status !== event.status ? (
+        <ConfirmButton
+          key={status}
+          title="Lưu sự kiện"
+          disabled={busy || final}
+          description={
+            status === "CANCELLED"
+              ? `Hủy sự kiện ${event.name}? Sau khi hủy không thể xuất bản lại.`
+              : `Xuất bản sự kiện ${event.name} để mọi người đặt vé?`
+          }
+          onConfirm={async () => {
+            await save();
+          }}
+        />
+      ) : (
+        <Button
+          title="Lưu sự kiện"
+          busy={busy}
+          disabled={final}
+          onPress={save}
+        />
+      )}
     </Card>
   );
 }
