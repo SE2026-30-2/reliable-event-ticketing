@@ -81,7 +81,7 @@ Qua outbox (`outbox_events`, relay `@Scheduled`, at-least-once):
 
 ## Tài khoản seed (chỉ dev)
 
-`db/dev-seed/V2__seed_admin.sql` tạo ADMIN `admin@commerceforge.local` / `Admin@12345`, nhưng file này **không nằm trong migration mặc định**: nó chỉ chạy khi `spring.flyway.locations` (env `SPRING_FLYWAY_LOCATIONS`) có thêm `classpath:db/dev-seed`. Môi trường thật tạo ADMIN đầu tiên theo hướng dẫn trong [setup.md](../setup.md#tạo-admin-đầu-tiên-môi-trường-thật). Mật khẩu DB (`SPRING_DATASOURCE_PASSWORD`) là bắt buộc, không có mặc định.
+`db/dev-seed/V2__seed_admin.sql` tạo tài khoản ADMIN demo, sau đó `V3__rename_demo_admin.sql` đặt email thành `admin@ticketing.local` và tên `Reliable Event Ticketing Admin`; mật khẩu là `Admin@12345`. Các file này **không nằm trong migration mặc định**: chúng chỉ chạy khi `spring.flyway.locations` (env `SPRING_FLYWAY_LOCATIONS`) có thêm `classpath:db/dev-seed`. Môi trường thật tạo ADMIN đầu tiên theo hướng dẫn trong [setup.md](../setup.md#tạo-admin-đầu-tiên-môi-trường-thật). Mật khẩu DB (`SPRING_DATASOURCE_PASSWORD`) là bắt buộc, không có mặc định.
 
 ## Lưu ý bảo mật
 

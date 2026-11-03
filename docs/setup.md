@@ -108,7 +108,7 @@ Lần đầu `ticketing-platform` tự sinh khóa ký tại `./keys/ticket_signi
 
 ## Tài khoản mặc định
 
-Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `identity-service` seed một ADMIN: **`admin@commerceforge.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
+Chỉ khi `.env` có `IDENTITY_SERVICE_FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/dev-seed` (bản `.env.example` đã bật), `identity-service` seed một ADMIN: **`admin@ticketing.local` / `Admin@12345`** — chỉ dùng local/dev/CI. Seed nằm ở `db/dev-seed/`, **không** thuộc migration mặc định nên một môi trường thật sẽ không có tài khoản mật khẩu công khai nào.
 
 ### Cấp quyền nhà tổ chức (ORGANIZER)
 
@@ -155,7 +155,7 @@ Kịch bản dưới đây dùng người mua mới đăng ký, nên cần `TICK
 
 ```bash
 TOKEN=$(curl -s -X POST localhost:8087/api/user/login -H 'Content-Type: application/json' \
-  -d '{"email":"admin@commerceforge.local","password":"Admin@12345"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
+  -d '{"email":"admin@ticketing.local","password":"Admin@12345"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
 A="Authorization: Bearer $TOKEN"; J='Content-Type: application/json'
 
 EVENT=$(curl -s -X POST localhost:8091/api/event -H "$A" -H "$J" \
