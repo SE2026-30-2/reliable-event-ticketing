@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         service:
           - identity-service
@@ -71,6 +72,9 @@ jobs:
 
   docker:
     name: Docker Compose smoke test
+    needs:
+      - backend
+      - frontend
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -80,7 +84,11 @@ jobs:
         run: docker compose --env-file .env.example config --quiet
 
       - name: Build and start the stack
-        run: docker compose --env-file .env.example up -d --build --wait --wait-timeout 300
+        run: |
+          docker compose --env-file .env.example build identity-service
+          docker compose --env-file .env.example build ticketing-platform
+          docker compose --env-file .env.example build frontend
+          docker compose --env-file .env.example up -d --no-build --wait --wait-timeout 300
 
       - name: Check service health and API endpoints
         run: |
