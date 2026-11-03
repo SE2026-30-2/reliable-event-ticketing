@@ -1,0 +1,13 @@
+# Owners are assigned from recent path-specific contribution history.
+# Each account must have write access in this repository for review requests.
+/frontend/ @dinhhoang0712 @duy-301205 @Quincy15th
+/mobile/ @dinhhoang0712 @duy-301205 @Quincy15th
+/backend/ @dinhhoang0712 @cuong4205 @duchaiz1001
+/docker/ @dinhhoang0712 @cuong4205
+/docker-compose.yml @dinhhoang0712 @cuong4205 @duchai1015
+/.env.example @dinhhoang0712 @cuong4205 @duchai1015 @duy-301205 @Quincy15th
+/docs/ @dinhhoang0712 @cuong4205 @duchai1015 @duy-301205 @Quincy15th
+/.github/ @dinhhoang0712
+/AGENTS.md @dinhhoang0712
+/CONTRIBUTING.md @dinhhoang0712
+/README.md @dinhhoang0712
