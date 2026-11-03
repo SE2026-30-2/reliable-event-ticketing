@@ -39,8 +39,6 @@ export default function MyTickets() {
 
     // Fetch & Enrich dữ liệu từ API
     const loadData = async () => {
-        setLoading(true);
-        setError("");
         try {
             const [ticketsRes, waitlistRes] = await Promise.all([
                 ticketService.getMyTickets(),
@@ -59,7 +57,9 @@ export default function MyTickets() {
                     try {
                         const eventDetail = await eventService.getEventById(eId);
                         eventMap[eId] = eventDetail;
-                    } catch {}
+                    } catch {
+                        // Ticket details remain usable when event metadata is unavailable.
+                    }
                 })
             );
 
@@ -80,6 +80,7 @@ export default function MyTickets() {
 
             setTickets(enrichedTickets);
             setWaitlist(rawWaitlist);
+            setError("");
         } catch (err) {
             console.error("Lỗi khi tải dữ liệu vé:", err);
             setError(err.message || "Không thể tải danh sách vé. Vui lòng thử lại sau.");
@@ -89,7 +90,9 @@ export default function MyTickets() {
     };
 
     useEffect(() => {
-        loadData();
+        // The loader updates state only after its awaited API requests resolve.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void loadData();
     }, []);
 
     // 2. Gọi API gửi lại email vé
@@ -217,7 +220,16 @@ export default function MyTickets() {
                     {error && (
                         <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-center justify-between">
                             <span>{error}</span>
-                            <button onClick={loadData} className="font-bold underline">Thử lại</button>
+                            <button
+                                onClick={() => {
+                                    setLoading(true);
+                                    setError("");
+                                    void loadData();
+                                }}
+                                className="font-bold underline"
+                            >
+                                Thử lại
+                            </button>
                         </div>
                     )}
 

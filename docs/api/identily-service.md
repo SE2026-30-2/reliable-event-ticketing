@@ -1,4 +1,4 @@
-# GateKeep - identity-service API Reference
+# Reliable Event Ticketing - Identity Service API Reference
 
 Identity Provider của hệ thống: đăng ký/đăng nhập bằng email + mật khẩu, xác minh email, đặt lại mật khẩu, quản lý role (`USER`, `ORGANIZER`, `ADMIN`), và là nơi **duy nhất phát hành JWT (RS256)**. `ticketing-platform` chỉ **xác minh** JWT qua JWKS của service này, không chia sẻ secret.
 

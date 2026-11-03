@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
@@ -8,16 +8,13 @@ export default function PaymentGateway() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const bookingData = location.state || {};
+    const bookingData = useMemo(() => location.state || {}, [location.state]);
     const txnRef        = bookingData.txnRef || null;
     const paymentUrl    = bookingData.paymentUrl || null;
     const amountCents   = bookingData.amountCents || 0;
 
     const eventName     = bookingData.eventName || "Sự kiện";
-    const ticketType    = bookingData.ticketType || "Vé";
     const quantity      = bookingData.quantity || 1;
-    const customerName  = bookingData.customerName || "";
-    const customerEmail = bookingData.customerEmail || "";
     const orderCode     = txnRef || bookingData.orderCode || "—";
 
     const displayAmount = amountCents > 0

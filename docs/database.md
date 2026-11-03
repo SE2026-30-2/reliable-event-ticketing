@@ -1,4 +1,4 @@
-# GateKeep - Cơ sở dữ liệu
+# Reliable Event Ticketing - Cơ sở dữ liệu
 
 Hai database PostgreSQL 16 riêng biệt, schema do Flyway quản lý; Hibernate không tự tạo hay sửa schema. Khóa nội bộ `id BIGSERIAL` + khóa nghiệp vụ `UUID` (cột `*_id`) dùng xuyên suốt.
 

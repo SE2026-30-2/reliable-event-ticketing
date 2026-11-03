@@ -22,7 +22,7 @@ export default function PaymentResult() {
     const vnpResponseCode = searchParams.get("vnp_ResponseCode");
     const locationState = location.state || {};
 
-    const [status, setStatus] = useState("loading"); // "loading" | "success" | "failed" | "expired"
+    const [status, setStatus] = useState(() => locationState.status || (vnpTxnRef ? "loading" : "success"));
     const [payment, setPayment] = useState(null);
     const [issuedTickets, setIssuedTickets] = useState(locationState.tickets || []);
     const [isResending, setIsResending] = useState(false);
@@ -34,7 +34,6 @@ export default function PaymentResult() {
     useEffect(() => {
         // 1. Nếu đi từ MOCK / FREE (đã có state.status)
         if (locationState.status) {
-            setStatus(locationState.status);
             return;
         }
 
@@ -65,8 +64,6 @@ export default function PaymentResult() {
             return;
         }
 
-        // Fallback mặc định
-        setStatus("success");
     }, [locationState.status, vnpTxnRef, vnpResponseCode]);
 
     // Gửi lại email chứa vé

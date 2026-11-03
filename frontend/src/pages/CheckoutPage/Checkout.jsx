@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
@@ -32,24 +32,6 @@ function formatVnd(cents) {
     return Math.round(cents / 100).toLocaleString("vi-VN") + "đ";
 }
 
-function QrPlaceholder() {
-    return (
-        <svg className="w-full h-full text-slate-800" fill="currentColor" viewBox="0 0 100 100">
-            <path d="M10 10 h30 v30 h-30 z M16 16 v18 h18 v-18 z M22 22 h6 v6 h-6 z" />
-            <path d="M60 10 h30 v30 h-30 z M66 16 v18 h18 v-18 z M72 22 h6 v6 h-6 z" />
-            <path d="M10 60 h30 v30 h-30 z M16 66 v18 h18 v-18 z M22 72 h6 v6 h-6 z" />
-            <rect height="8" width="8" x="46" y="10" />
-            <rect height="12" width="8" x="46" y="24" />
-            <rect height="8" width="12" x="10" y="46" />
-            <rect height="8" width="8" x="28" y="46" />
-            <rect height="8" width="8" x="46" y="46" />
-            <rect height="8" width="14" x="60" y="46" />
-            <rect height="14" width="8" x="46" y="60" />
-            <rect height="16" width="16" x="74" y="74" />
-        </svg>
-    );
-}
-
 async function pollUntilIssued(ticketIds, maxAttempts = 20, intervalMs = 1000) {
     for (let i = 0; i < maxAttempts; i++) {
         const results = await Promise.all(ticketIds.map((id) => ticketService.getTicketById(id)));
@@ -68,7 +50,7 @@ export default function Checkout() {
 
     const locationState = location.state || {};
     const reservationId = locationState.reservationId || null;
-    const tickets      = locationState.tickets || [];
+    const tickets      = useMemo(() => locationState.tickets || [], [locationState.tickets]);
     const amountCents  = locationState.amountCents ?? locationState.totalAmountCents ?? null;
     const discountCents = locationState.discountCents ?? 0;
 
@@ -80,14 +62,10 @@ export default function Checkout() {
     const customerEmail      = locationState.customerEmail ?? locationState.holderEmail ?? "";
 
     const firstExpiry = tickets[0]?.reservationExpiresAt;
-    const initialSeconds = firstExpiry
-        ? Math.max(0, Math.floor((new Date(firstExpiry).getTime() - Date.now()) / 1000))
-        : 600;
 
     const [event, setEvent]               = useState(null);
-    const [loadingEvent, setLoadingEvent] = useState(true);
     const [paymentMethod, setPaymentMethod] = useState("mock_success");
-    const [timeLeft, setTimeLeft]         = useState(initialSeconds);
+    const [timeLeft, setTimeLeft]         = useState(600);
     const expired = timeLeft <= 0;
 
     const [paying, setPaying]         = useState(false);
@@ -95,18 +73,24 @@ export default function Checkout() {
     const [missingState]              = useState(!reservationId);
 
     useEffect(() => {
-        if (!eventId) { setLoadingEvent(false); return; }
+        if (!eventId) return;
         eventService.getEventById(eventId)
             .then((data) => setEvent(data))
             .catch(() => {})
-            .finally(() => setLoadingEvent(false));
     }, [eventId]);
 
     useEffect(() => {
         if (timeLeft <= 0) return;
-        const t = setInterval(() => setTimeLeft((p) => p - 1), 1000);
+        const t = setInterval(() => {
+            setTimeLeft((remaining) => {
+                if (firstExpiry) {
+                    return Math.max(0, Math.floor((new Date(firstExpiry).getTime() - Date.now()) / 1000));
+                }
+                return Math.max(0, remaining - 1);
+            });
+        }, 1000);
         return () => clearInterval(t);
-    }, [timeLeft]);
+    }, [firstExpiry, timeLeft]);
 
     const handlePayment = useCallback(async () => {
         if (!reservationId) return;

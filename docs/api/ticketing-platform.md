@@ -1,4 +1,4 @@
-# GateKeep - ticketing-platform API Reference
+# Reliable Event Ticketing - Ticketing Platform API Reference
 
 Base URL `http://localhost:8091`. Swagger UI: `/swagger-ui.html`, OpenAPI: `/api-docs`. Định dạng JSON, thời gian ISO-8601 UTC.
 

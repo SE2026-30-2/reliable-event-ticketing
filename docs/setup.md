@@ -1,8 +1,4 @@
-# GateKeep - Chạy local và vận hành
-
-## Docker PostgreSQL migration
-
-Both databases now share one PostgreSQL container. Before starting the apps with existing volumes, follow [postgres-migration.md](postgres-migration.md).
+# Reliable Event Ticketing - Chạy local và vận hành
 
 ## Docker PostgreSQL migration
 
@@ -82,7 +78,7 @@ Compose đã đặt sẵn giá trị đúng cho mạng nội bộ; dưới đây
 | `CORS_ALLOWED_ORIGINS`                                                             | `http://localhost:5173`                                                 | cả hai app                                                                                                                                                                                                                                |
 | `FRONTEND_BASE_URL`                                                                | `http://localhost:5173`                                                 | dùng dựng link trong email xác thực/đặt lại mật khẩu                                                                                                                                                                                      |
 | `MAIL_HOST/PORT/USERNAME/PASSWORD`                                                 | Mailtrap sandbox, rỗng                                                  | tài khoản SMTP; thiếu thì app vẫn chạy nhưng gửi mail lỗi (chỉ log)                                                                                                                                                                       |
-| `MAIL_FROM`                                                                        | `no-reply@gatekeep.example`                                             | địa chỉ gửi — **phải là sender/domain đã xác minh với nhà cung cấp SMTP**, nếu không mail bị từ chối                                                                                                                                      |
+| `MAIL_FROM`                                                                        | `no-reply@ticketing.example`                                            | địa chỉ mẫu — thay bằng sender/domain đã xác minh với nhà cung cấp SMTP trước khi gửi mail                                                                                                                                             |
 | `MAIL_SMTP_AUTH` / `MAIL_STARTTLS`                                                 | `true` / `true`                                                         | cổng 587 của hầu hết nhà cung cấp cần cả hai                                                                                                                                                                                              |
 
 Frontend (`frontend/.env`): `VITE_USER_SERVICE_URL` (mặc định `http://localhost:8087`), `VITE_TICKETING_SERVICE_URL` (mặc định `http://localhost:8091`).
@@ -103,10 +99,7 @@ Giữ hạ tầng trong compose, chạy app bằng Maven. Mật khẩu DB không
 
 ```bash
 docker compose up -d postgres zookeeper broker
-docker compose up -d postgres zookeeper broker
 set -a; source .env; set +a
-(cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
-(cd backend/ticketing-platform && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 (cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
 (cd backend/ticketing-platform && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 ```
@@ -241,11 +234,14 @@ cd backend/ticketing-platform
 ./mvnw test -Dtest='!*IT'                       # unit + context smoke (H2, không cần Docker)
 ./mvnw test -Dtest='*IT'                        # Docker, Postgres + Kafka thật: CheckinRecordConcurrencyIT, ReservationPaymentFlowIT, VnpayPaymentFlowIT, LifecycleIT
 cd ../identity-service && ./mvnw test
-cd ../../frontend && npm test                    # vitest: xác minh QR trên thiết bị
-npm run build                                   # tsc + vite build
+cd ../../frontend && npm ci
+npm run lint
+npm run test:unit                               # Node.js test runner
+npm run build                                   # Vite production build
 ```
 
-Test `*IT` cố ý không nằm trong luồng mặc định/CI (cần Docker đáng tin cậy); chạy theo yêu cầu bằng `-Dtest=`.
+Test `*IT` cố ý không nằm trong luồng Maven mặc định/CI (cần Docker đáng tin cậy); chạy theo yêu cầu bằng `-Dtest=`.
+GitHub Actions chạy unit/smoke tests cho cả hai backend, lint/unit/build cho frontend, đồng thời dựng toàn bộ Compose stack và kiểm tra health/API cơ bản.
 
 ## Troubleshooting
 

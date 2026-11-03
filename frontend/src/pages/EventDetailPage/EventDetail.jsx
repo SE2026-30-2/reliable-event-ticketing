@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
@@ -26,8 +26,10 @@ export default function EventDetail({ currentUser: propUser }) {
     const [quantity, setQuantity] = useState(1);
     const [couponInput, setCouponInput] = useState("");
     const [appliedCoupon, setAppliedCoupon] = useState("");
-    const [fullName, setFullName] = useState("");
-    const [email, setEmail] = useState("");
+    const [fullName, setFullName] = useState(null);
+    const [email, setEmail] = useState(null);
+    const formFullName = fullName ?? currentUser?.fullName ?? currentUser?.name ?? "";
+    const formEmail = email ?? currentUser?.email ?? "";
     const [bannerFailed, setBannerFailed] = useState(false);
 
     // Dynamic Quote & Submitting States
@@ -89,7 +91,7 @@ export default function EventDetail({ currentUser: propUser }) {
     }, [selectedTicket, quantity]);
 
     // 2. Fetch Realtime Quote via API (GET /api/ticket-types/:id/quote)
-    const fetchQuote = async (ticketTypeId, qty, couponCode) => {
+    const fetchQuote = useCallback(async (ticketTypeId, qty, couponCode) => {
         if (!ticketTypeId) return;
         setLoadingQuote(true);
         try {
@@ -129,22 +131,16 @@ export default function EventDetail({ currentUser: propUser }) {
         } finally {
             setLoadingQuote(false);
         }
-    };
+    }, [selectedTicket]);
 
     // Recalculate Quote when ticket, quantity, or applied coupon changes
     useEffect(() => {
         if (selectedTicketId) {
+            // This starts an async request whose loading state is managed by fetchQuote.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             fetchQuote(selectedTicketId, quantity, appliedCoupon);
         }
-    }, [selectedTicketId, quantity, appliedCoupon]);
-
-    // Auto-fill user info if logged in
-    useEffect(() => {
-        if (currentUser) {
-            setFullName((prev) => prev || currentUser.fullName || currentUser.name || "");
-            setEmail((prev) => prev || currentUser.email || "");
-        }
-    }, [currentUser]);
+    }, [selectedTicketId, quantity, appliedCoupon, fetchQuote]);
 
     const formatDate = (dateString) => {
         if (!dateString) return "";
@@ -181,7 +177,7 @@ export default function EventDetail({ currentUser: propUser }) {
             return;
         }
 
-        if (!fullName.trim() || !email.trim()) {
+        if (!formFullName.trim() || !formEmail.trim()) {
             alert("Vui lòng nhập đầy đủ Họ tên và Email người nhận vé!");
             return;
         }
@@ -192,8 +188,8 @@ export default function EventDetail({ currentUser: propUser }) {
                 // Call Waitlist API: POST /api/ticket-types/:id/waitlist
                 await eventService.joinWaitlist(selectedTicketId, {
                     quantity,
-                    holderName: fullName,
-                    holderEmail: email
+                    holderName: formFullName,
+                    holderEmail: formEmail
                 });
                 alert("Bạn đã tham gia danh sách chờ thành công! Chúng tôi sẽ thông báo qua Email khi có vé.");
             } else {
@@ -224,10 +220,10 @@ export default function EventDetail({ currentUser: propUser }) {
                         quantity,
                         pricePerTicket: unitPrice,
                         totalAmount: finalTotal,
-                        customerName: fullName,
-                        customerEmail: email,
-                        holderName: fullName,
-                        holderEmail: email,
+                        customerName: formFullName,
+                        customerEmail: formEmail,
+                        holderName: formFullName,
+                        holderEmail: formEmail,
                         quote: quote || {
                             originalPrice: fallbackPrice,
                             discountAmount: 0,
@@ -529,14 +525,14 @@ export default function EventDetail({ currentUser: propUser }) {
                                             className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500"
                                             type="text"
                                             placeholder="Họ và tên (holderName) *"
-                                            value={fullName}
+                                            value={formFullName}
                                             onChange={(e) => setFullName(e.target.value)}
                                         />
                                         <input
                                             className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500"
                                             type="email"
                                             placeholder="Email (holderEmail) *"
-                                            value={email}
+                                            value={formEmail}
                                             onChange={(e) => setEmail(e.target.value)}
                                         />
                                     </div>

@@ -1,4 +1,4 @@
-# GateKeep - Luồng nghiệp vụ
+# Reliable Event Ticketing - Luồng nghiệp vụ
 
 Tài liệu mô tả từng luồng từ góc nhìn người dùng và quy tắc nghiệp vụ. Các luồng này đã được chạy thật trên stack Docker (API và giao diện trình duyệt). Cơ chế kỹ thuật: [architecture.md](architecture.md); endpoint chi tiết: [api/ticketing-platform.md](api/ticketing-platform.md).
 

@@ -2,3 +2,7 @@ target
 .git
 .idea
 *.log
+.env
+.env.*
+keys/
+*.pem
