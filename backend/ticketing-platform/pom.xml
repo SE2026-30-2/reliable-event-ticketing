@@ -8,11 +8,24 @@
 		<version>3.3.10</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.ticketing.microservices</groupId>
+	<groupId>com.ticketing</groupId>
 	<artifactId>ticketing-platform</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>ticketing-platform</name>
-	<description>Ticketing Platform (modular monolith: catalog, payment, checkin, notification)</description>
+	<description>Reliable Event Ticketing (modular monolith: catalog, payment, check-in, notification)</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
 	<properties>
 		<java.version>21</java.version>
 		<!-- Spring Boot's pinned Testcontainers version hardcodes a Docker API version check that
@@ -21,8 +34,10 @@
 	</properties>
 	<dependencies>
 		<!-- Two independent uses: (1) verifies identity-service's JWT (NimbusJwtDecoder.withJwkSetUri) to
-		     gate ROLE_ADMIN endpoints; (2) supplies the nimbus-jose-jwt JWK/JWKS types this service's
-		     own JwksController uses to publish its QR-signing public key. -->
+		     gate ROLE_ADMIN endpoints, same as order-service's SecurityConfig; (2) supplies the
+		     nimbus-jose-jwt JWK/JWKS types this service's own JwksController uses to publish its
+		     QR-signing public key - no separate OAuth2 Authorization Server dependency needed, same
+		     reasoning as identity-service's pom.xml. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
@@ -95,7 +110,9 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- Used only by contextLoads() smoke test -->
+		<!-- Used only by TicketServiceApplicationTests' contextLoads() smoke test - see order-service's
+		     pom.xml for the full rationale (Docker-outside-of-Docker not reliably available in every
+		     CI/sandbox this project runs in). -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
@@ -115,7 +132,8 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 		<!-- Renders a ticket's signed QR payload as a PNG for the issued-ticket email (notification
-		     module) - javase pulls in core + the BufferedImage writer. -->
+		     module) - javase pulls in core + the BufferedImage writer, nothing more is needed since
+		     this app only ever encodes (never scans/decodes an image) a QR code. -->
 		<dependency>
 			<groupId>com.google.zxing</groupId>
 			<artifactId>core</artifactId>

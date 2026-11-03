@@ -10,7 +10,7 @@
 ## Chạy test Payment
 
 ```powershell
-cd backend
+cd backend/ticketing-platform
 .\mvnw.cmd "-Dtest=CreatePaymentRequestApplicationServiceTest,OnlinePaymentApplicationServiceTest,VnpayGatewayTest,VnpaySignerTest" test
 ```
 
@@ -49,7 +49,7 @@ Tại thư mục backend:
 - Failures và Errors: cần bằng 0.
 - Skipped: kiểm tra để biết có test bị bỏ qua không.
 
-Báo cáo chi tiết nằm trong backend/target/surefire-reports.
+Báo cáo chi tiết nằm trong backend/ticketing-platform/target/surefire-reports.
 
 ## Kết quả kiểm tra
 

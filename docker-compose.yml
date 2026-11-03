@@ -57,9 +57,7 @@ services:
   # Ticketing Platform (Port 8091) - modular monolith: catalog, payment, checkin, notification
   ticketing-platform:
     build:
-      # The complete application is still in backend/src; the new module is only partially migrated.
-      context: ./backend
-      dockerfile: ticketing-platform/Dockerfile
+      context: ./backend/ticketing-platform
     image: ticketing-platform:local
     container_name: ticketing-platform
     restart: unless-stopped

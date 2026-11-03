@@ -1,9 +1,0 @@
-package com.techie.microservices.ticketing.checkin.domain.exception;
-
-import java.util.UUID;
-
-public class DeviceNotFoundException extends RuntimeException {
-    public DeviceNotFoundException(UUID deviceId) {
-        super("Check-in device " + deviceId + " not found");
-    }
-}

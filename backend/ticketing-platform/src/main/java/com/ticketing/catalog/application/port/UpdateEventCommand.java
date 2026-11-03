@@ -1,0 +1,27 @@
+package com.ticketing.catalog.application.port;
+
+import com.ticketing.catalog.domain.model.EventStatus;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/** Every field except the id is optional: null = leave unchanged. */
+public record UpdateEventCommand(
+        UUID eventId,
+        String name,
+        String venue,
+        String description,
+        String bannerUrl,
+        Instant startsAt,
+        Instant endsAt,
+        EventStatus status,
+        com.ticketing.catalog.domain.model.EventCategory category,
+        Instant salesStartAt,
+        Instant salesEndAt,
+        boolean clearSalesSchedule
+) {
+    public UpdateEventCommand(UUID eventId, String name, String venue, String description, String bannerUrl,
+                              Instant startsAt, Instant endsAt, EventStatus status) {
+        this(eventId, name, venue, description, bannerUrl, startsAt, endsAt, status, null, null, null, false);
+    }
+}

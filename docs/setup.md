@@ -106,9 +106,9 @@ docker compose up -d postgres zookeeper broker
 docker compose up -d postgres zookeeper broker
 set -a; source .env; set +a
 (cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
-(cd backend && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
+(cd backend/ticketing-platform && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 (cd backend/identity-service && SPRING_DATASOURCE_PASSWORD=$IDENTITY_DB_PASSWORD SPRING_FLYWAY_LOCATIONS=$IDENTITY_SERVICE_FLYWAY_LOCATIONS ./mvnw spring-boot:run)   # :8087
-(cd backend && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
+(cd backend/ticketing-platform && SPRING_DATASOURCE_PASSWORD=$TICKETING_DB_PASSWORD TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME=$TICKETING_PAYMENT_ALLOW_FORCE_OUTCOME ./mvnw spring-boot:run)   # :8091
 ```
 
 Lần đầu `ticketing-platform` tự sinh khóa ký tại `./keys/ticket_signing_key.pem` (thư mục này bị `.gitignore`).
@@ -237,10 +237,10 @@ curl -s localhost:8091/api/checkin/events/$EVENT/stats -H "$A"
 ## Kiểm thử
 
 ```bash
-cd backend
+cd backend/ticketing-platform
 ./mvnw test -Dtest='!*IT'                       # unit + context smoke (H2, không cần Docker)
 ./mvnw test -Dtest='*IT'                        # Docker, Postgres + Kafka thật: CheckinRecordConcurrencyIT, ReservationPaymentFlowIT, VnpayPaymentFlowIT, LifecycleIT
-cd identity-service && ./mvnw test
+cd ../identity-service && ./mvnw test
 cd ../../frontend && npm test                    # vitest: xác minh QR trên thiết bị
 npm run build                                   # tsc + vite build
 ```
