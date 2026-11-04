@@ -20,6 +20,8 @@ Report nguon va PDF: `BT3_23001881_VT-051.html` va `BT3_23001881_VT-051.pdf`.
 
 ## Trang thai nop
 
-Branch local: `assignment/BT3-23001881-VT-051`. Baseline: `aa5ea7d8ef8da4e0472b7327c81e612b64337103`. Chua push GitHub va chua tao PR; khong co remote link de bao cao. Cac thay doi hien tai la characterization tests va harness, khong trien khai reviewer approval workflow.
+Branch: `assignment/BT3-23001881-VT-051`. Repository canonical theo xac nhan cua sinh vien: `SE2026-30-2/reliable-event-ticketing` (de bai ghi ten cu `Resilient-Order-Workflow`). Baseline: `aa5ea7d8ef8da4e0472b7327c81e612b64337103`. Cac thay doi la characterization tests va harness, khong trien khai reviewer approval workflow.
+
+GitHub branch: https://github.com/SE2026-30-2/reliable-event-ticketing/tree/assignment/BT3-23001881-VT-051
 
 Test commit: `4d189a7` (`test: characterize reviewer and concurrent check-in risks`).

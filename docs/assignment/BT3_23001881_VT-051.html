@@ -31,9 +31,12 @@ th { background: #eaf1f2; color: #173b45; }
 <div class="meta">
 <b>Sinh viên:</b> Vũ Đình Hoàng · 23001881<br>
 <b>Nhóm / đề tài:</b> SE2026-T12 · APP-07 Reliable Event Ticketing với QR check-in<br>
-<b>Repository:</b> SE2026-30-2/Resilient-Order-Workflow<br>
+<b>Repository canonical (sinh viên xác nhận):</b> SE2026-30-2/reliable-event-ticketing<br>
+<b>Ghi chú:</b> đề bài ghi tên cũ Resilient-Order-Workflow<br>
 <b>Baseline:</b> <span class="commit">aa5ea7d8ef8da4e0472b7327c81e612b64337103</span><br>
-<b>Branch local:</b> assignment/BT3-23001881-VT-051 · test commit <span class="commit">4d189a7</span> · chưa push, chưa có PR<br>
+<b>Branch:</b> assignment/BT3-23001881-VT-051<br>
+<b>GitHub branch:</b> https://github.com/SE2026-30-2/reliable-event-ticketing/tree/assignment/BT3-23001881-VT-051<br>
+<b>Test commit:</b> <span class="commit">4d189a7</span><br>
 <b>Phạm vi thực thi:</b> characterization security test và concurrency harness trên module check-in; không triển khai workflow reviewer.
 </div>
 <p><b>Cam kết:</b> “Tôi chịu trách nhiệm về toàn bộ code, test và nội dung bài làm; tôi đã khai báo việc sử dụng AI.”</p>
@@ -120,7 +123,7 @@ th { background: #eaf1f2; color: #173b45; }
 <p>Confidence tăng lên khi kết luận dựa vào hành vi chạy được thay vì đề xuất của AI. Security test đi qua Spring Security filter chain xác nhận authority REVIEWER không thể PATCH event; use case sửa dữ liệu không bị gọi. Mutation bỏ kiểm tra cửa sổ hiệu lực QR làm kết quả đổi từ EXPIRED_WINDOW thành ACCEPTED. Sau khi khôi phục validation, 20 test unit/API chạy xanh. Repository có advisory lock theo ticket và unique index cho entry_no, nên kiểm tra concurrency cần PostgreSQL thật, không chỉ mock. Tuy nhiên, Testcontainers không chạy vì Docker daemon không sẵn sàng; tôi chưa có p95 cho 200 tác vụ và không thể kết luận đạt mục tiêu 5 giây. Harness chỉ đo persistence, không gồm HTTP, JWT, Kafka, mạng hay hạ tầng triển khai. Change request reviewer cũng chưa được triển khai: repo chưa định nghĩa tài nguyên review, phân công, state machine approve/reject, quyền đọc dữ liệu nhạy cảm hoặc lưu audit. Chỉ thêm role có thể tạo quyền nửa vời; identity-service phát hành claim JWT, còn ticketing phải giới hạn dữ liệu theo phạm vi và chặn mọi đường sửa gốc. Bước tiếp theo giá trị nhất là chốt với product/giảng viên resource và trạng thái review, rồi viết API contract cùng test âm trước implementation. Khi Docker sẵn sàng, chạy CheckinRecordConcurrencyIT nhiều lần, ghi p95 và cấu hình máy, sau đó bổ sung HTTP load test 200 client trên endpoint approval thật. Cũng cần kiểm tra race approve/reject, rollback khi ghi audit lỗi và phân quyền đọc theo resource. Evidence hiện có xác nhận test bắt được một validation bị bỏ và reviewer bị chặn khỏi PATCH hiện hữu. Nó chưa chứng minh workflow approval, quyền đọc an toàn, atomicity PostgreSQL trong lần chạy này hay hiệu năng production. Tôi sẽ xem đó là giới hạn cần công khai, không suy diễn từ test pass.</p>
 <p class="small">Reflection khoảng 320 từ; bản nháp AI dựa trên evidence lần chạy này, sinh viên cần rà soát và chỉnh cho đúng trải nghiệm cá nhân.</p>
 <h2>Trạng thái phát hành</h2>
-<p>Nhánh hiện chỉ ở local repository. Không có remote link hoặc PR vì chưa push; không merge. Sau review nhóm và khi có quyền GitHub phù hợp, push branch rồi cập nhật URL cùng commit hash thực tế.</p>
+<p>Repository canonical và branch link theo xác nhận của sinh viên. Branch riêng, không merge; chưa tạo PR để chờ nhóm review. Tên repository trong email đề bài (`Resilient-Order-Workflow`) khác tên remote hiện hành (`reliable-event-ticketing`).</p>
 </section>
 
 <section class="appendix">
