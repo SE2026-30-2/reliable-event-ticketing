@@ -21,6 +21,8 @@ import {
 import { EventForm } from "@/components/event-form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { CheckinReport } from "@/components/checkin-report";
+import { SalesReport } from "@/components/sales-report";
+import { categoryLabel } from "@/lib/events";
 import { DeviceKey } from "@/components/device-key";
 import { useResource } from "@/hooks/use-resource";
 import { patch, post, request } from "@/lib/api";
@@ -311,6 +313,13 @@ function ManagementPanel({
               />
               <InfoRow label="Thời gian" value={dateTime(event.startsAt)} />
               <InfoRow label="Địa điểm" value={event.venue} />
+              <InfoRow label="Danh mục" value={categoryLabel(event.category)} />
+              <Body muted>
+                Mở bán:{" "}
+                {event.salesStartAt
+                  ? `${dateTime(event.salesStartAt)} → ${dateTime(event.salesEndAt)}`
+                  : "Từ khi xuất bản đến khi kết thúc"}
+              </Body>
               <Body muted>
                 Cập nhật: {dateTime((data as Report).generatedAt)}
               </Body>
@@ -351,6 +360,7 @@ function ManagementPanel({
                 title="Mở soát vé"
                 onPress={() => router.push("/checkin")}
               />
+              <SalesReport id={id} />
             </Card>
           )}
           {tab === "types" && (

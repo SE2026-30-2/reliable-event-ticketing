@@ -39,7 +39,10 @@ function ManageContent() {
     .sort((a, b) =>
       sort === "name"
         ? a.name.localeCompare(b.name, "vi")
-        : Date.parse(a.startsAt) - Date.parse(b.startsAt),
+        : sort === "newest"
+          ? Date.parse(b.createdAt || "1970-01-01") -
+            Date.parse(a.createdAt || "1970-01-01")
+          : Date.parse(a.startsAt) - Date.parse(b.startsAt),
     );
   const { reload } = resource;
   useFocusEffect(
@@ -101,6 +104,7 @@ function ManageContent() {
         options={[
           ["date", "Ngày gần nhất"],
           ["name", "Tên A–Z"],
+          ["newest", "Mới nhất"],
         ]}
         onChange={setSort}
       />

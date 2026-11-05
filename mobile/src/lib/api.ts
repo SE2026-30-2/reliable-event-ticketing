@@ -52,6 +52,7 @@ export async function request<T>(
   if (options.signal?.aborted) controller.abort();
   const timeout = setTimeout(cancel, 15000);
   const token = options.token ?? accessToken;
+  const multipart = options.body instanceof FormData;
   try {
     const response = await fetch(`${endpoints[service]}${path}`, {
       method: options.method || "GET",
@@ -59,7 +60,7 @@ export async function request<T>(
       headers: {
         Accept:
           options.responseType === "text" ? "text/csv" : "application/json",
-        ...(options.body !== undefined
+        ...(options.body !== undefined && !multipart
           ? { "Content-Type": "application/json" }
           : {}),
         ...(!options.public && !options.deviceKey && token
@@ -68,7 +69,11 @@ export async function request<T>(
         ...(options.deviceKey ? { "X-Device-Key": options.deviceKey } : {}),
       },
       ...(options.body !== undefined
-        ? { body: JSON.stringify(options.body) }
+        ? {
+            body: multipart
+              ? (options.body as FormData)
+              : JSON.stringify(options.body),
+          }
         : {}),
     });
     const raw = await response.text();

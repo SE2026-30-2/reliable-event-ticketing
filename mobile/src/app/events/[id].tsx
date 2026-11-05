@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { View, Pressable, Text } from "react-native";
 import {
@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/contexts/auth";
 import { useResource } from "@/hooks/use-resource";
 import { post, request } from "@/lib/api";
+import { categoryLabel, salesMessage } from "@/lib/events";
 import {
   dateTime,
   isEmail,
@@ -52,6 +53,22 @@ export default function EventDetail() {
     [id],
   );
   const resource = useResource(load);
+  const viewed = useRef("");
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (resource.data?.event.status !== "PUBLISHED" || viewed.current === id)
+      return;
+    viewed.current = id;
+    void request(`/api/event/${encodeURIComponent(id)}/views`, {
+      method: "POST",
+      body: {},
+      public: true,
+    }).catch(() => {});
+  }, [id, resource.data]);
   const [selectedId, setSelectedId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [coupon, setCoupon] = useState("");
@@ -87,6 +104,12 @@ export default function EventDetail() {
   } = useResource(loadQuote);
   async function book() {
     if (lock.current || !selected) return;
+    const closed =
+      resource.data && salesMessage(resource.data.event, Date.now());
+    if (closed) {
+      setError(closed);
+      return;
+    }
     if (!user) {
       router.push({ pathname: "/login", params: { eventId: id } });
       return;
@@ -149,11 +172,17 @@ export default function EventDetail() {
     <Screen>
       <Banner uri={event.bannerUrl} />
       <Badge>{event.status}</Badge>
+      <Badge>{categoryLabel(event.category)}</Badge>
       <Title>{event.name}</Title>
       <Body muted>{event.venue}</Body>
       <Body muted>
         {dateTime(event.startsAt)} → {dateTime(event.endsAt)}
       </Body>
+      {!!event.salesStartAt && (
+        <Body muted>
+          Mở bán: {dateTime(event.salesStartAt)} → {dateTime(event.salesEndAt)}
+        </Body>
+      )}
       <Card>
         <Heading>Giới thiệu sự kiện</Heading>
         <Body>{event.description || "Ban tổ chức chưa cập nhật mô tả."}</Body>
@@ -195,6 +224,7 @@ export default function EventDetail() {
       ) : (
         <Card>
           <Heading>Chọn vé của bạn</Heading>
+          <Feedback message={salesMessage(event, now)} />
           {types.length === 0 && <Body muted>Sự kiện chưa mở bán vé.</Body>}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {types.map((type) => (
@@ -330,7 +360,7 @@ export default function EventDetail() {
                 disabled={
                   !ready ||
                   (!!user && !waiting && (quoteBusy || !quote)) ||
-                  event.status !== "PUBLISHED"
+                  !!salesMessage(event, now)
                 }
                 onPress={book}
               />

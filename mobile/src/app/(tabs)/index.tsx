@@ -14,12 +14,15 @@ import {
   styles,
 } from "@/components/ui-kit";
 import { request } from "@/lib/api";
-import { listOf, type Event, type Page } from "@/lib/types";
+import { type Event, type Page } from "@/lib/types";
 import { useResource } from "@/hooks/use-resource";
+import { FilterOptions } from "@/components/filter-options";
+import { categories } from "@/lib/events";
 export default function Discover() {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [category, setCategory] = useState("");
   const load = useCallback(
     async (signal: AbortSignal) => {
       const data = await request<Event[] | Page<Event>>(
@@ -36,6 +39,9 @@ export default function Discover() {
     [query, page],
   );
   const resource = useResource(load);
+  const visible = (resource.data?.content || []).filter(
+    (event) => !category || event.category === category,
+  );
   return (
     <Screen>
       <Card
@@ -64,6 +70,18 @@ export default function Discover() {
         />
       </Card>
       <Badge>{query ? `Kết quả: ${query}` : "Tất cả sự kiện"}</Badge>
+      <FilterOptions
+        label="Danh mục sự kiện"
+        value={category}
+        options={[["", "Tất cả danh mục"], ...categories]}
+        onChange={setCategory}
+      />
+      {!!category && (
+        <Body muted>
+          Lọc danh mục trong trang hiện tại. Dùng Trước/Sau để xem các trang
+          khác.
+        </Body>
+      )}
       <Feedback message={resource.error} retry={resource.reload} />
       {resource.loading ? (
         <Loading />
@@ -71,10 +89,10 @@ export default function Discover() {
         !resource.error && (
           <>
             {resource.data &&
-              listOf(resource.data).map((event) => (
+              visible.map((event) => (
                 <EventCard key={event.eventId} event={event} />
               ))}
-            {!resource.data?.content?.length && (
+            {!visible.length && (
               <Card>
                 <Body muted>Không tìm thấy sự kiện phù hợp.</Body>
               </Card>

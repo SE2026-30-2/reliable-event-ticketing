@@ -58,7 +58,7 @@ Kiểm tra offline không biết vé vừa thu hồi hoặc lượt vào đã d�
 
 ## Phần để lại
 
-- Không thêm bộ lọc danh mục: API sự kiện chưa cung cấp trường danh mục hoặc lọc theo danh mục.
+- Danh mục hiện lấy từ trường `category` của API. Bộ lọc khám phá áp dụng trong trang kết quả đang hiển thị, giống frontend; API chưa có tham số lọc danh mục.
 - Không thêm sửa hồ sơ, mạng xã hội hoặc các nút giao diện web chưa có API/luồng hoàn chỉnh.
 - API quản trị mới yêu cầu cập nhật `backend/ticketing-platform`: `GET /api/admin/payments/by-reservation/{reservationId}` và `GET /api/admin/payments/{paymentRequestId}`. Chỉ ADMIN được gọi, áp dụng cả VNPay/FREE/MOCK; API người mua tiếp tục kiểm tra quyền sở hữu. Tra cứu không khớp mã hoặc hoàn tiền không được xác nhận sẽ chặn thao tác tiếp theo cho đến khi tra cứu lại.
 
@@ -72,6 +72,9 @@ npm.cmd run typecheck
 npm.cmd run test:browser
 npx.cmd expo export --platform android --platform ios --output-dir dist/native
 ```
+
+Đối chiếu chức năng frontend/mobile và phần bổ sung danh mục, lịch mở bán, ảnh bìa, thống kê: [FEATURE-PARITY.vi.md](./FEATURE-PARITY.vi.md).
+Chọn ảnh bìa dùng `expo-image-picker` SDK 58; development build cần được build lại sau khi cập nhật. Ảnh chỉ tải lên khi lưu sự kiện.
 
 Kiểm thử Playwright chạy ở viewport 390×844, giả lập API theo đúng response backend để kiểm tra luồng giao diện. Trên Windows dùng Edge đã cài; trên hệ khác cài Chromium bằng `npx playwright install chromium` hoặc chọn `PLAYWRIGHT_CHANNEL`. Server kiểm thử dùng cổng 8082 và được tự khởi động nếu chưa chạy.
 
