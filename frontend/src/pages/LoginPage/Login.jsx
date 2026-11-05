@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import { authService } from '../../services/authService';
+import { LoadingOverlay, LoadingSpinner } from '../../components/common/Loading';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -37,6 +38,13 @@ export default function Login() {
 
     return (
         <div className="relative min-h-screen text-slate-800 flex flex-col justify-center select-none antialiased bg-[#F8FAFD] overflow-x-hidden font-sans">
+            {loading && (
+                <LoadingOverlay
+                    message="Đang đăng nhập..."
+                    subtext="Vui lòng đợi trong giây lát, đang xác thực tài khoản..."
+                />
+            )}
+
             {/* Ambient Background Blobs */}
             <div className="absolute -top-[10%] -left-[8%] w-[48vw] h-[48vw] bg-[radial-gradient(circle,rgba(219,234,254,0.75)_0%,rgba(239,246,255,0)_70%)] rounded-full blur-[45px] z-0 pointer-events-none"></div>
             <div className="absolute -top-[12%] -right-[6%] w-[45vw] h-[45vw] bg-[radial-gradient(circle,rgba(224,231,255,0.8)_0%,rgba(245,243,255,0)_70%)] rounded-full blur-[50px] z-0 pointer-events-none"></div>
@@ -254,9 +262,13 @@ export default function Login() {
                                     disabled={loading}
                                     className="w-full mt-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/40 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
                                 >
-                                    <svg className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                                        <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
-                                    </svg>
+                                    {loading ? (
+                                        <LoadingSpinner size="sm" color="white" />
+                                    ) : (
+                                        <svg className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                                            <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
+                                        </svg>
+                                    )}
                                     <span>{loading ? 'Đang xử lý...' : 'Đăng nhập'}</span>
                                 </button>
                             </form>

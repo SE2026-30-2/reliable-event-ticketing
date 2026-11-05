@@ -5,12 +5,14 @@ import Footer from '../../components/layout/Footer';
 import { useAuth } from '../../contexts/useAuth';
 import { userService } from '../../services/userService';
 import { hasRole } from '../../utils/permissions';
+import { LoadingOverlay, LoadingSpinner } from '../../components/common/Loading';
 
 export default function Profile() {
     const { user: authUser, logout } = useAuth();
 
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [signingOut, setSigningOut] = useState(false);
     const [resendingEmail, setResendingEmail] = useState(false);
     const [resendMessage, setResendMessage] = useState('');
 
@@ -55,6 +57,8 @@ export default function Profile() {
 
     // 2. Xử lý Đăng xuất (Gửi API /api/user/logout & xóa local storage)
     const handleLogout = async () => {
+        if (signingOut) return;
+        setSigningOut(true);
         try {
             await userService.logout();
         } catch (error) {
@@ -90,6 +94,12 @@ export default function Profile() {
 
     return (
         <div className="bg-[#f8fafc] text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+            {signingOut && (
+                <LoadingOverlay
+                    message="Đang đăng xuất..."
+                    subtext="Đang hoàn tất phiên làm việc, vui lòng đợi..."
+                />
+            )}
             {/* Header dùng chung */}
             <Header />
 
@@ -348,9 +358,17 @@ export default function Profile() {
 
                                     <button
                                         onClick={handleLogout}
-                                        className="w-full py-3 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-sm font-bold rounded-2xl shadow-md shadow-rose-200 transition-all"
+                                        disabled={signingOut}
+                                        className="w-full py-3 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-sm font-bold rounded-2xl shadow-md shadow-rose-200 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
                                     >
-                                        Đăng xuất
+                                        {signingOut ? (
+                                            <>
+                                                <LoadingSpinner size="sm" color="white" />
+                                                <span>Đang đăng xuất...</span>
+                                            </>
+                                        ) : (
+                                            'Đăng xuất'
+                                        )}
                                     </button>
                                 </div>
 
