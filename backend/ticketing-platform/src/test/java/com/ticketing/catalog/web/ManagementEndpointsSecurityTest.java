@@ -106,6 +106,14 @@ class ManagementEndpointsSecurityTest {
     }
 
     @Test
+    void reviewerCannotModifyOriginalEventData() throws Exception {
+        mvc.perform(patch("/api/event/{id}", eventId).with(as("reviewer@x.com", "REVIEWER"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Changed by reviewer\"}"))
+                .andExpect(status().isForbidden());
+        verify(updateEvent, never()).updateEvent(any());
+    }
+
+    @Test
     void anOrganizerCreatesAnEventOwnedByTheirOwnAccount() throws Exception {
         when(createEvent.createEvent(any())).thenReturn(Event.builder().eventId(eventId).name("Gig").status(EventStatus.PUBLISHED)
                 .startsAt(Instant.now()).endsAt(Instant.now()).build());

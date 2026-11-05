@@ -196,11 +196,13 @@ class SubmitCheckinApplicationServiceTest {
         when(checkinRecordRepositoryPort.findByIdempotencyKey(any())).thenReturn(Optional.empty());
         when(deviceRepositoryPort.findByApiKeyHash(keyHash)).thenReturn(Optional.of(activeDevice()));
         when(ticketQrVerifier.verify("qr")).thenReturn(Optional.of(expiredClaims));
+        when(checkinRecordRepositoryPort.tryAccept(any(), anyInt())).thenReturn(AcceptResult.ACCEPTED);
         when(checkinRecordRepositoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         CheckinRecord result = service.submitCheckin(cmd);
 
         assertThat(result.getOutcome()).isEqualTo(CheckinOutcome.EXPIRED_WINDOW);
+        verify(checkinRecordRepositoryPort, never()).tryAccept(any(), anyInt());
     }
 
     @Test

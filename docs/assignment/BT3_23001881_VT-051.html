@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>BT3_23001881_VT-051</title>
+<style>
+@page { size: A4; margin: 14mm 15mm 16mm; }
+* { box-sizing: border-box; }
+body { color: #233238; font: 9.4pt/1.42 "Arial", sans-serif; margin: 0; }
+h1 { color: #153f49; font-size: 26pt; line-height: 1.08; margin: 0 0 3mm; }
+h2 { color: #153f49; font-size: 16pt; line-height: 1.15; margin: 0 0 4mm; }
+h3 { color: #23616b; font-size: 10.5pt; margin: 4mm 0 1.5mm; }
+p { margin: 1.8mm 0; }
+ul, ol { margin: 1.5mm 0 2mm; padding-left: 5mm; }
+li { margin: 1mm 0; }
+table { border-collapse: collapse; font-size: 7.7pt; margin: 2.5mm 0 3.5mm; width: 100%; }
+th, td { border-bottom: 1px solid #cbd5d7; padding: 1.7mm 1.5mm; text-align: left; vertical-align: top; }
+th { background: #e8f0ef; color: #153f49; font-weight: 700; }
+tr:nth-child(even) td { background: #f7f9f8; }
+code, .commit { color: #174e58; font-family: Consolas, "Courier New", monospace; font-size: 8pt; overflow-wrap: anywhere; }
+pre { background: #edf3f2; border-left: 2px solid #d15b45; font: 7.5pt/1.4 Consolas, monospace; padding: 3mm; white-space: pre-wrap; }
+.page { break-after: page; min-height: 255mm; position: relative; }
+.eyebrow { color: #d15b45; font-size: 8pt; font-weight: 700; margin-bottom: 2mm; text-transform: uppercase; }
+.topline { border-top: 3px solid #153f49; margin: 0 0 5mm; padding-top: 3mm; }
+.meta { background: #f0f5f4; border-left: 3px solid #d15b45; display: grid; gap: 1.5mm 4mm; grid-template-columns: 1fr 1fr; margin: 5mm 0; padding: 4mm; }
+.meta div { min-width: 0; }
+.meta b, .label { color: #153f49; }
+.lead { color: #43575d; font-size: 11pt; line-height: 1.48; margin: 4mm 0; max-width: 165mm; }
+.callout { background: #f3f6f5; border-left: 3px solid #347b72; margin: 3mm 0; padding: 3mm 4mm; }
+.warning { background: #fbf1ee; border-left-color: #d15b45; }
+.metric { color: #153f49; font-size: 15pt; font-weight: 700; }
+.two-col { display: grid; gap: 4mm; grid-template-columns: 1fr 1fr; }
+.small { color: #53646a; font-size: 8pt; }
+.tag { color: #d15b45; font-weight: 700; }
+.page-foot { border-top: 1px solid #cbd5d7; bottom: 0; color: #64777c; font-size: 7.5pt; left: 0; padding-top: 2mm; position: absolute; right: 0; }
+.appendix { break-before: page; }
+@media screen {
+  body { background: #e8eeed; margin: 0 auto; max-width: 900px; padding: 24px; }
+  .page, .appendix { background: #fff; box-shadow: 0 3px 18px #193d4518; margin: 0 0 24px; min-height: 1120px; padding: 48px 52px; }
+  .page-foot { bottom: 48px; left: 52px; right: 52px; }
+}
+</style>
+</head>
+<body>
+<section class="page">
+<div class="eyebrow">APP-07 · Kiểm thử và chất lượng phần mềm · Bài cá nhân 03</div>
+<div class="topline"></div>
+<h1>Quyền reviewer<br>khi có truy cập đồng thời</h1>
+<p class="lead">Đặc tả theo rủi ro, kiểm thử characterization và harness concurrency với PostgreSQL cho biến thể VT-051.</p>
+<div class="meta">
+<div><b>Sinh viên</b><br>Vũ Đình Hoàng · 23001881</div>
+<div><b>Nhóm / vai trò</b><br>SE2026-T12 · Nhóm trưởng</div>
+<div><b>Dự án</b><br>APP-07 Reliable Event Ticketing với QR check-in</div>
+<div><b>Repository chính thức</b><br>SE2026-30-2/reliable-event-ticketing</div>
+<div><b>Commit baseline</b><br><span class="commit">aa5ea7d8ef8da4e0472b7327c81e612b64337103</span></div>
+<div><b>Nhánh / commit test</b><br><span class="commit">assignment/BT3-23001881-VT-051</span><br><span class="commit">4d189a7</span></div>
+<div><b>Liên kết nhánh</b><br>github.com/SE2026-30-2/reliable-event-ticketing/tree/assignment/BT3-23001881-VT-051</div>
+<div><b>Trạng thái nộp</b><br>Đã push nhánh; chưa tạo PR/merge; chờ nhóm review</div>
+</div>
+<div class="callout warning"><b>Ranh giới phạm vi.</b> Repository chưa có tài nguyên hoặc quy trình phê duyệt dành cho reviewer. Bài làm bổ sung kiểm thử characterization cho quyền ghi và mở rộng harness concurrency gần nhất; không khẳng định đã triển khai reviewer workflow từ đầu đến cuối.</div>
+<p><b>Cam kết:</b> “Tôi chịu trách nhiệm về toàn bộ code, test và nội dung bài làm; tôi đã khai báo việc sử dụng AI.”</p>
+<h2>Phát biểu vấn đề</h2>
+<p>Bổ sung vai trò reviewer có thể xem và phê duyệt một thay đổi được đề xuất nhưng không thể sửa bản ghi nguồn. Các yêu cầu đồng thời trên cùng đối tượng review không được tạo ra các quyết định đã commit mâu thuẫn nhau. Repository hiện chưa xác định đối tượng approval, quy tắc phân công, state machine, endpoint hay hợp đồng audit. Vì vậy, phần có thể chạy được trong bài này characterization ranh giới quyền ghi và kiểm tra race trên tài nguyên tương tự ở luồng check-in.</p>
+<div class="page-foot">BT3 · VT-051 <span style="float:right">01 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">01 · Xác định hành vi mong đợi</div>
+<div class="topline"></div>
+<h2>Đặc tả và tiêu chí chấp nhận</h2>
+<p>Reviewer phải là authority riêng, không phải bí danh của organizer/admin. Phê duyệt là quyết định đối với một mục review, không phải quyền sửa event, ticket, payment hay bản ghi nguồn khác.</p>
+<table>
+<tr><th>ID</th><th>Tiêu chí chấp nhận</th><th>Kết quả quan sát được</th><th>Ưu tiên</th></tr>
+<tr><td>AC1</td><td>Reviewer chỉ đọc mục review và các trường trong phạm vi được giao.</td><td>Đọc đúng phạm vi thành công; không lộ dữ liệu/tài nguyên không liên quan.</td><td>P1</td></tr>
+<tr><td>AC2</td><td>Reviewer ghi quyết định APPROVE hoặc REJECT với actor đã xác thực và thời gian từ server.</td><td>Quyết định và audit được lưu bền vững; tài nguyên gốc không đổi.</td><td>P0</td></tr>
+<tr><td>AC3</td><td>Reviewer không gọi được thao tác ghi dữ liệu nguồn.</td><td>403; use case ghi không được gọi và không có side effect.</td><td>P0</td></tr>
+<tr><td>AC4</td><td>Quyết định đồng thời trên cùng review đang mở chỉ tạo một chuyển trạng thái hợp lệ.</td><td>Tối đa một quyết định commit; yêu cầu thua nhận conflict/no-op theo hợp đồng.</td><td>P0</td></tr>
+<tr><td>AC5</td><td>Yêu cầu quyết định sai hoặc thiếu dữ liệu bị từ chối trước persistence.</td><td>400/409 theo hợp đồng; không có quyết định/audit dở dang.</td><td>P1</td></tr>
+</table>
+<h3>Ràng buộc phi chức năng</h3>
+<div class="two-col">
+<div class="callout"><div class="metric">200</div><b>Tác vụ đồng thời.</b> Kiểm chứng workflow ở mức 200 yêu cầu cùng lúc; báo cáo p95, không chỉ thời gian trung bình.</div>
+<div class="callout"><div class="metric">≤ 5.0 s</div><b>Mục tiêu độ trễ.</b> p95 đầu-cuối; harness chỉ đo persistence không đủ để tuyên bố production đạt mục tiêu.</div>
+</div>
+<p><b>Khả năng kiểm toán:</b> phải truy xuất được actor, thời gian và kết quả quyết định. <b>Tương thích:</b> không nới role hiện hữu hoặc đổi API/schema dùng chung khi chưa có thiết kế được thống nhất.</p>
+<div class="callout warning"><b>Invariant cần bảo vệ.</b> Reviewer chỉ được tạo bản ghi quyết định, không được cập nhật bản ghi nguồn. Với cùng review ID, không thể cùng commit cả approve và reject. Trong harness thực tế, số lượt check-in của một ticket không bao giờ vượt capacity dù nhiều lần quét xảy ra đồng thời.</div>
+<p class="small">Evidence trong repository hỗ trợ invariant check-in; tiêu chí reviewer workflow vẫn là đề xuất cho đến khi resource và hợp đồng approval được xác định.</p>
+<div class="page-foot">Specification <span style="float:right">02 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">02 · Đối chiếu repository</div>
+<div class="topline"></div>
+<h2>Kế hoạch AI và evidence trong mã nguồn</h2>
+<p><b>Prompt dùng trước khi code:</b> “Đọc APP-07 và đề xuất hai phương án tối thiểu để reviewer có thể xem/phê duyệt nhưng không sửa dữ liệu nguồn. Liệt kê file/hợp đồng bị ảnh hưởng, invariant, concurrency test, mutation validation và assumptions. Chưa sửa code cho đến khi plan được review.”</p>
+<h3>Repository hiện có gì?</h3>
+<table>
+<tr><th>Evidence</th><th>Quan sát</th><th>Ảnh hưởng thiết kế</th></tr>
+<tr><td>Quản lý role và JWT claim <code>roles</code> trong <code>identity-service</code></td><td>Identity cấp role; ticketing ánh xạ claim thành authority <code>ROLE_…</code>.</td><td>Role reviewer thật liên quan cả identity và ticketing; chỉ sửa filter chain ticketing thì chưa cấp được role.</td></tr>
+<tr><td><code>SecurityConfig</code>, API reference</td><td>Quy tắc quản lý hiện nhận ADMIN/ORGANIZER. Không có reviewer endpoint.</td><td>API đọc event công khai hiện có không đồng nghĩa với quyền đọc review theo phạm vi.</td></tr>
+<tr><td><code>EventApplicationService</code>, <code>Event</code></td><td>Event có chỉnh sửa/chuyển trạng thái nhưng không có snapshot đề xuất hay trạng thái phê duyệt.</td><td>Không thể tự suy luận trường event nào cần reviewer duyệt.</td></tr>
+<tr><td><code>CheckinRecordRepositoryAdapter</code></td><td>Khóa transaction advisory theo ticket, đếm lượt accepted, unique index làm chốt chặn.</td><td>Concurrency proof cần PostgreSQL; Mockito không xác minh được bảo đảm này.</td></tr>
+<tr><td><code>CheckinRecordConcurrencyIT</code></td><td>Testcontainers hiện có kiểm tra race một người thắng và vé nhiều lượt.</td><td>Mở rộng harness sẵn có, không tạo framework kiểm thử mới.</td></tr>
+</table>
+<h3>Hai phương án đã cân nhắc</h3>
+<div class="two-col">
+<div class="callout"><b>Phương án A · Workflow hoàn chỉnh</b><br>Thêm reviewer role, API đọc theo phạm vi và quyết định, model review/audit bền vững, rồi tích hợp test qua hai service.<br><span class="tag">Tạm hoãn</span>: chưa rõ resource, cách phân công và hợp đồng chuyển trạng thái.</div>
+<div class="callout"><b>Phương án B · Characterization slice</b><br>Kiểm chứng ranh giới quyền ghi quản lý hiện có và mở rộng concurrency test PostgreSQL trên tài nguyên gần nhất.<br><span class="tag">Đã chọn</span>: chạy được theo convention repo, không tự phát minh contract.</div>
+</div>
+<p><b>Hiệu chỉnh plan bằng evidence:</b> (1) Plan ban đầu cho rằng thêm authority ở ticketing là đủ. JWT role do identity-service phát hành nên muốn cấp reviewer phải có chính sách role phía identity. (2) Plan gợi ý thêm optimistic version. Nhưng check-in đã khóa ghi theo ticket bằng advisory lock PostgreSQL và có unique index bảo vệ; thay chiến lược hiện có sẽ thêm rủi ro mà không có evidence. (3) Bỏ migration approval khỏi slice: không nên tự tạo bảng/API trước khi thống nhất resource, phân công và thời hạn lưu audit.</p>
+<p class="small"><b>File dự kiến và đã đổi:</b> <code>ManagementEndpointsSecurityTest</code>, <code>SubmitCheckinApplicationServiceTest</code>, <code>CheckinRecordConcurrencyIT</code>, cùng report và README. Không sửa production code, DTO, route, migration hay identity-service.</p>
+<div class="page-foot">Review kế hoạch <span style="float:right">03 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">03 · Thiết kế test theo rủi ro</div>
+<div class="topline"></div>
+<h2>Chiến lược test · quyền truy cập và quyết định</h2>
+<p>Các lỗi tác động lớn nhất là ghi nguồn trái phép, lộ dữ liệu giữa các reviewer, quyết định đồng thời mâu thuẫn và persistence một phần. Unit test kiểm tra validation xác định; API test chạy security filter và xác nhận side effect; integration test trên PostgreSQL kiểm chứng atomicity. E2E giao diện được hoãn đến khi có màn hình và endpoint reviewer.</p>
+<table>
+<tr><th>ID</th><th>Level / risk</th><th>Điều kiện và input</th><th>Kết quả mong đợi</th><th>Trạng thái</th></tr>
+<tr><td>T01</td><td>API · ghi dữ liệu nguồn</td><td>JWT role REVIEWER; PATCH event hiện hữu.</td><td>403; use case update không được gọi.</td><td>Đã làm, pass</td></tr>
+<tr><td>T02</td><td>API · đọc hợp lệ</td><td>Reviewer được giao đọc các trường review cho phép.</td><td>200; không có trường ngoài projection đã thống nhất.</td><td>Workflow tương lai</td></tr>
+<tr><td>T03</td><td>API · vượt phạm vi</td><td>Reviewer yêu cầu review/resource chưa được giao.</td><td>403/404 theo policy; không lộ dữ liệu.</td><td>Workflow tương lai</td></tr>
+<tr><td>T04</td><td>Integration · lưu quyết định</td><td>Review OPEN; approve hợp lệ với actor đã xác thực.</td><td>Decision/audit được lưu; snapshot nguồn không đổi.</td><td>Workflow tương lai</td></tr>
+<tr><td>T05</td><td>API negative · đường ghi khác</td><td>Reviewer gọi route khác có thể sửa dữ liệu nguồn.</td><td>403 và không ghi trên mọi mutation route.</td><td>Workflow tương lai</td></tr>
+<tr><td>T06</td><td>Integration · failure path</td><td>Gây lỗi insert audit trong transaction quyết định.</td><td>Rollback nguyên tử; không có decision thiếu audit.</td><td>Workflow tương lai</td></tr>
+</table>
+<p><b>Test chưa cần ở thời điểm này:</b> E2E không thể kiểm tra cấp reviewer hay phê duyệt vì cả hai chưa tồn tại; UI giả lập chỉ test mock chứ không test authorization contract. Không tính các test thiết kế tương lai là coverage đã đạt.</p>
+<h3>Negative test và mức ưu tiên</h3>
+<p>T01 và T05 là negative authorization; T03 là negative theo phạm vi; T06 là failure path. P0 là lỗi có thể sửa nguồn, tạo kết quả mâu thuẫn hoặc để lại quyết định thiếu audit. P1 là lỗi lộ dữ liệu/validation nghiêm trọng nhưng không trực tiếp vi phạm invariant ghi hoặc atomicity.</p>
+<div class="callout warning"><b>Giới hạn evidence hiện tại:</b> T01 chứng minh một PATCH route hiện có từ chối authority REVIEWER. Test không chứng minh reviewer đọc được review được giao, phê duyệt được hay được cấp role đúng từ identity-service.</div>
+<div class="page-foot">Chiến lược test · quyền truy cập <span style="float:right">04 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">04 · Thiết kế test theo rủi ro</div>
+<div class="topline"></div>
+<h2>Chiến lược test · đồng thời và validation</h2>
+<table>
+<tr><th>ID</th><th>Level / risk</th><th>Dữ liệu test</th><th>Kết quả mong đợi</th><th>Trạng thái</th></tr>
+<tr><td>T07</td><td>Concurrency · approve/approve</td><td>Hai request độc lập, cùng review ID, chung start gate.</td><td>Tối đa một chuyển trạng thái OPEN; request thua nhận conflict/no-op đã định nghĩa.</td><td>Workflow tương lai</td></tr>
+<tr><td>T08</td><td>Concurrency · approve/reject</td><td>Hai quyết định, actor riêng, cùng review ID.</td><td>Không thể cùng commit hai trạng thái cuối; nguồn không đổi.</td><td>Workflow tương lai</td></tr>
+<tr><td>T09</td><td>Unit/API negative · validation</td><td>Thiếu decision, ID sai định dạng hoặc actor chưa xác thực.</td><td>400; persistence/audit port không được gọi.</td><td>Workflow tương lai</td></tr>
+<tr><td>T10</td><td>PostgreSQL IT · tranh capacity</td><td>200 worker, một ticket, maxEntries=1, idempotency key riêng.</td><td>Chính xác một ACCEPTED; các request còn lại thua nguyên tử.</td><td>Đã thêm harness; Docker chặn chạy</td></tr>
+<tr><td>T11</td><td>Unit mutation · bỏ validation</td><td>QR đã ký nhưng ngoài validFrom..validUntil; stub <code>tryAccept</code> trả ACCEPTED.</td><td>EXPIRED_WINDOW; không gọi atomic insert.</td><td>Mutation bị bắt</td></tr>
+<tr><td>T12</td><td>PostgreSQL IT · ranh giới capacity</td><td>10 worker, cùng ticket, maxEntries=3, idempotency key khác nhau.</td><td>Đúng 3 ACCEPTED với entry_no 1,2,3; không trùng/thiếu.</td><td>Test có sẵn; Docker chặn chạy</td></tr>
+</table>
+<h3>Lý do chọn dữ liệu concurrency</h3>
+<p>Các worker cùng dùng ticket ID vì lock và invariant capacity áp dụng theo từng ticket. Mỗi request có idempotency UUID mới để cơ chế replay request trùng không che mất race. Trường hợp một lượt có oracle rõ ràng (1 người thắng trên 200); trường hợp ba lượt kiểm tra cả biên và đánh số. CountDownLatch cho các worker bắt đầu cùng lúc; thời gian tính sau khi mở gate, gồm thời gian repository và tranh chấp kết nối DB.</p>
+<div class="two-col">
+<div class="callout"><b>Unit</b><br>Kiểm tra validation và quyết định một cách nhanh, xác định. Test QR hết hạn hiện có làm oracle cho mutation.</div>
+<div class="callout"><b>API</b><br>MockMvc chạy qua Spring Security filter chain, xác nhận side effect ở controller/use case chứ không chỉ status.</div>
+<div class="callout"><b>Integration</b><br>Testcontainers + PostgreSQL kiểm tra transaction lock, SQL insert và unique-index backstop.</div>
+<div class="callout"><b>E2E</b><br>Hoãn đến khi có reviewer route/UI; chưa có workflow để tự động hóa.</div>
+</div>
+<p class="small"><b>Giảm flaky:</b> UUID ngẫu nhiên cô lập dữ liệu giữa các lần chạy; truy vấn theo đúng ticket ID, không phụ thuộc thứ tự test. Future timeout 60 giây giới hạn treo. Tải máy và thời gian Docker khởi động vẫn gây biến thiên, cần ghi lại khi đo performance.</p>
+<div class="page-foot">Chiến lược test · race và validation <span style="float:right">05 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">05 · Test-first và review thay đổi</div>
+<div class="topline"></div>
+<h2>Slice chạy được và evidence kiểm thử</h2>
+<div class="meta">
+<div><b>Baseline</b><br><span class="commit">aa5ea7d8ef8da4e0472b7327c81e612b64337103</span></div>
+<div><b>Commit test</b><br><span class="commit">4d189a7</span></div>
+<div><b>Commit xác minh</b><br><span class="commit">9c65b2be43937a256f052a63b323e10dadff53b5</span></div>
+<div><b>Nhánh</b><br>assignment/BT3-23001881-VT-051</div>
+</div>
+<h3>Thay đổi trong slice chạy được</h3>
+<ol>
+<li><code>ManagementEndpointsSecurityTest.reviewerCannotModifyOriginalEventData</code> gửi JWT REVIEWER tới event PATCH hiện có, kỳ vọng 403 và xác nhận <code>UpdateEventUseCase</code> không được gọi.</li>
+<li><code>CheckinRecordConcurrencyIT</code> đo thời gian từng request, tính p95 và thêm test invariant một ticket/200 worker. Các assertion 8-worker và 10-worker cũ vẫn giữ nguyên.</li>
+<li><code>SubmitCheckinApplicationServiceTest.rejectsATicketOutsideItsValidityWindow</code> stub atomic insert trả ACCEPTED và xác nhận không gọi insert nếu QR hết hạn. Cách này ngăn mutation test yếu đi qua lỗi mock chưa cấu hình.</li>
+</ol>
+<div class="callout warning"><b>Giới hạn của test-first.</b> Đây là slice characterization/harness, không phải patch reviewer feature. Security contract hiện tại đã từ chối role chưa biết, nên test reviewer-denial mới pass ngay trên baseline. Test này không chứng minh workflow approval còn thiếu bằng một lần đỏ. Evidence đỏ/xanh thực tế là mutation validation bên dưới; không diễn giải thành reviewer implementation hoàn chỉnh.</div>
+<h3>Evidence fail → khôi phục → pass</h3>
+<table>
+<tr><th>Bước</th><th>Lệnh / thao tác</th><th>Evidence quan sát</th></tr>
+<tr><td>Baseline</td><td>Commit tại thời điểm bắt đầu</td><td><span class="commit">aa5ea7d8ef8da4e0472b7327c81e612b64337103</span></td></tr>
+<tr><td>Mutation fail</td><td>Tạm bỏ kiểm tra validity window; chạy <code>SubmitCheckinApplicationServiceTest#rejectsATicketOutsideItsValidityWindow</code>.</td><td>Fail đúng lý do nghiệp vụ: mong EXPIRED_WINDOW, nhận ACCEPTED.</td></tr>
+<tr><td>Khôi phục</td><td>Khôi phục validation production; giữ assertion test mạnh hơn.</td><td>Không có mutation production trong hai commit nộp.</td></tr>
+<tr><td>Focused pass</td><td>Chạy ManagementEndpointsSecurityTest + SubmitCheckinApplicationServiceTest.</td><td>20 test; 0 failure, 0 error, 0 skipped.</td></tr>
+<tr><td>Module verify</td><td>Chạy <code>.\mvnw.cmd -B -ntp verify</code>.</td><td>177 test; 0 failure, 0 error, 0 skipped; BUILD SUCCESS.</td></tr>
+<tr><td>Postgres IT</td><td>Chạy CheckinRecordConcurrencyIT.</td><td>Bị chặn trước test: Testcontainers không tìm thấy Docker.</td></tr>
+</table>
+<p><b>Review diff:</b> production code, route, DTO, schema và identity-service không đổi. Test 200 worker có start gate chung, request ID riêng, future có timeout và <code>shutdownNow()</code> trong <code>finally</code>; p95 là số liệu chẩn đoán, không phải pass/fail phụ thuộc cấu hình máy.</p>
+<div class="page-foot">Evidence triển khai <span style="float:right">06 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">06 · Ai kiểm tra chính các test?</div>
+<div class="topline"></div>
+<h2>Mutation, coverage và performance</h2>
+<h3>Lỗi cố ý: bỏ một validation quan trọng</h3>
+<p>Mutation xóa guard validity window khỏi <code>SubmitCheckinApplicationService</code>. Input là claim ký hợp lệ nhưng <code>validUntil</code> đã hết hạn một giờ. Kiểm tra thiết bị/chữ ký vẫn pass, cô lập đúng validation thời gian bị bỏ. Test cấu hình <code>tryAccept</code> trả ACCEPTED nếu bị gọi; sau đó fail với <code>expected EXPIRED_WINDOW but was ACCEPTED</code>. Đây là mutation bị bắt vì test thấy kết quả sai bên ngoài, không chỉ phụ thuộc chi tiết code. Guard được khôi phục trước các commit nộp.</p>
+<div class="callout"><b>Vì sao cần test mạnh hơn?</b> Lần mutation đầu gây NullPointerException do mock chưa cấu hình câu trả lời cho <code>tryAccept</code>. Điều đó phát hiện đổi control flow nhưng evidence còn yếu. Stub ACCEPTED giúp test khẳng định invariant thật: ticket hết hạn không được chấp nhận.</div>
+<h3>Đọc coverage theo rủi ro</h3>
+<table>
+<tr><th>Rủi ro / tiêu chí</th><th>Evidence</th><th>Kết luận</th></tr>
+<tr><td>Reviewer không gọi event PATCH (AC3)</td><td>MockMvc + security chain thật, 403; use case không chạy.</td><td>Được kiểm tra trên đúng route này.</td></tr>
+<tr><td>QR hết hạn không được nhận</td><td>Unit test bắt mutation; focused suite pass sau khôi phục.</td><td>Rủi ro validation có test.</td></tr>
+<tr><td>Capacity đồng thời trên ticket (analog AC4)</td><td>PostgreSQL IT có sẵn, đã thêm 200 worker.</td><td>Chưa chạy; atomicity và p95 chưa xác minh.</td></tr>
+<tr><td>Reviewer read, approval audit và xung đột quyết định</td><td>Chưa có implementation/resource/workflow.</td><td>Chưa cover; cần chốt contract trước.</td></tr>
+</table>
+<p>Module chưa cấu hình JaCoCo nên không có phần trăm line/branch coverage. Dù có phần trăm, nó cũng không chứng minh ghi nguồn đã bị chặn, quyết định xung đột được serialize hay audit rollback nguyên tử.</p>
+<h3>Đánh giá nguy cơ flaky</h3>
+<ol>
+<li><b>Lịch chạy/tranh chấp DB:</b> thời điểm bắt đầu đồng loạt có thể lệch theo CPU và connection pool. Dùng gate chung, đo mỗi request, timeout 60 giây và chạy lặp trên môi trường được ghi nhận trước khi diễn giải p95.</li>
+<li><b>Shared state/thứ tự:</b> ID tái sử dụng hoặc phụ thuộc row từ test trước gây lỗi theo thứ tự. Mỗi lượt chạy tạo ticket/idempotency key ngẫu nhiên; assertion chỉ truy vấn ticket đó và không phụ thuộc thứ tự test.</li>
+<li><b>Dependency ngoài:</b> Docker daemon/image có thể chặn Testcontainers trước khi vào thân test; đây là blocker môi trường, không phải product pass.</li>
+</ol>
+<div class="callout warning"><b>Chưa có kết quả performance.</b> Mục tiêu là 200 thao tác đồng thời, p95 ≤ 5.0 giây. Docker không kết nối được (thiếu pipe <code>dockerDesktopLinuxEngine</code>) nên chưa đo p95. Harness chỉ đo tranh chấp persistence, không thay được HTTP load có JWT, xử lý ứng dụng và độ trễ mạng.</div>
+<div class="page-foot">Mutation và chất lượng test <span style="float:right">07 / 08</span></div>
+</section>
+
+<section class="page">
+<div class="eyebrow">07 · Truy vết và reflection</div>
+<div class="topline"></div>
+<h2>Điều đã chứng minh và phần còn thiếu</h2>
+<table>
+<tr><th>Tiêu chí / risk</th><th>Test</th><th>File / commit</th><th>Kết quả</th></tr>
+<tr><td>AC3: reviewer không sửa event hiện hữu</td><td>T01</td><td><code>ManagementEndpointsSecurityTest</code><br><span class="commit">4d189a7</span></td><td>Pass: 403; use case ghi không chạy.</td></tr>
+<tr><td>Mutation validation: QR hết hạn</td><td>T11</td><td><code>SubmitCheckinApplicationServiceTest</code><br><span class="commit">4d189a7</span></td><td>Bị bắt: mutation trả ACCEPTED thay vì EXPIRED_WINDOW.</td></tr>
+<tr><td>Analog AC4: một resource, nhiều thay đổi đồng thời</td><td>T10/T12</td><td><code>CheckinRecordConcurrencyIT</code><br><span class="commit">4d189a7</span></td><td>Có harness; chưa chạy vì Docker.</td></tr>
+<tr><td>AC1/AC2 và approval audit</td><td>T02–T09</td><td>Chưa có endpoint/model</td><td>Không tuyên bố đã làm; cần contract từ product.</td></tr>
+</table>
+<h3>Hai output AI xem là giả thuyết, không phải evidence</h3>
+<p><b>1. “Thêm ROLE_REVIEWER vào rule bảo mật ticketing là xong.”</b> Chưa đủ: identity-service phát hành JWT role, còn ticketing phải giới hạn phạm vi resource. Chỉ sửa filter chain thì không cấp được role và cũng không giới hạn bản ghi reviewer được đọc.</p>
+<p><b>2. “Dùng concurrency test có mock để chứng minh approval nguyên tử.”</b> Không đáng tin: Mockito không chạy transaction PostgreSQL, advisory lock hoặc partial unique index. Cần chạy trên database thật để kiểm chứng persistence invariant; môi trường này chưa chạy được Docker.</p>
+<h3>Reflection · bản nháp sinh viên cần rà soát</h3>
+<p>Confidence tăng lên khi kết luận dựa vào hành vi chạy được thay vì lời khẳng định của AI. Security test đi qua Spring Security filter chain cho thấy authority REVIEWER bị từ chối khi gọi PATCH event; assertion còn xác nhận use case sửa dữ liệu không được gọi. Mutation bỏ kiểm tra thời hạn QR làm test trả ACCEPTED thay vì EXPIRED_WINDOW. Tôi đã cải thiện test để mock trả ACCEPTED nếu nhánh ghi được gọi, nhờ vậy test đỏ vì sai kết quả nghiệp vụ chứ không vì mock thiếu cấu hình. Sau khi khôi phục validation, 20 test liên quan và toàn bộ 177 test của module chạy xanh. Tuy vậy, confidence này chỉ áp dụng cho code đã chạy. Repository có advisory lock và unique index PostgreSQL cho lượt check-in, nhưng integration test 200 worker không khởi chạy vì Docker daemon không sẵn sàng; tôi chưa đo p95 và không thể nói đã đạt 5 giây. Harness cũng chỉ đo persistence, không có HTTP, JWT thật, Kafka hoặc mạng. Reviewer approval chưa được triển khai vì repository không xác định tài nguyên cần review, cách giao việc, state machine, quyền đọc dữ liệu hay audit retention. Tự thêm role và endpoint lúc này sẽ tạo contract do AI tự chọn. Việc tiếp theo có giá trị cao nhất là xác nhận resource và quy tắc approve/reject với chủ sản phẩm, rồi viết API contract và test âm trước implementation. Sau đó cần chạy concurrency test nhiều lần trên PostgreSQL, ghi cấu hình máy và p95, rồi thêm load test HTTP 200 client cho endpoint thật. Tôi cũng sẽ kiểm tra race approve/reject, lỗi khi ghi audit và quyền đọc ngoài scope. Evidence hiện tại chứng minh một validation test bắt mutation và một PATCH bị chặn; nó chưa chứng minh workflow reviewer, tính nguyên tử PostgreSQL trong lần chạy này hay hiệu năng production. Bản reflection cần được tôi chỉnh lại để phản ánh đúng trải nghiệm cá nhân trước khi nộp.</p>
+<p class="small">Reflection nằm trong giới hạn 250–350 từ; đây là bản nháp AI, sinh viên cần rà soát và cá nhân hóa.</p>
+<div class="callout"><b>Trạng thái cuối:</b> nhánh đã push riêng, chưa merge. Toàn bộ verify module pass. PostgreSQL concurrency test và p95 thực tế vẫn chưa chạy.</div>
+<div class="page-foot">Truy vết và reflection <span style="float:right">08 / 08</span></div>
+</section>
+
+<section class="appendix">
+<div class="eyebrow">Phụ lục · Tái lập kết quả</div>
+<div class="topline"></div>
+<h2>AI Usage Log và hướng dẫn chạy</h2>
+<p>Phụ lục này không tính vào giới hạn 8 trang nội dung chính.</p>
+<table>
+<tr><th>Công cụ / prompt</th><th>Output đã cân nhắc</th><th>Review / quyết định</th><th>Evidence</th></tr>
+<tr><td>OpenAI Codex coding agent<br><br>“Đọc repository; đề xuất hai phương án trước khi sửa; nêu contract, assumptions và evidence.”</td><td>A: reviewer role và approval model đầu-cuối. B: characterization cùng concurrency harness có sẵn.</td><td>Chọn B do chưa có resource/state review. Hoãn đổi identity/API/schema đến khi owner xác định scope. Bác bỏ việc chỉ dùng mock để chứng minh atomicity DB.</td><td>Security config identity/ticketing, API docs, event model, repository adapter và concurrency IT hiện hữu.</td></tr>
+<tr><td>OpenAI Codex coding agent<br><br>“Tạo patch test-only nhỏ; chứng minh reviewer PATCH bị từ chối; mở rộng DB contention test lên 200; thêm oracle mutation validation.”</td><td>Ba thay đổi test: từ chối reviewer PATCH, harness p95 200 worker, assertion QR hết hạn mạnh hơn.</td><td>Review từng diff; không sửa production/API/schema. Cải thiện test sau lần mutation đầu gây NPE; validation bị bỏ phải làm kết quả thành ACCEPTED để test fail theo nghiệp vụ.</td><td>Focused test 20/20; module verify 177/177; mutation bị bắt; Testcontainers bị Docker daemon chặn.</td></tr>
+</table>
+<h3>Lệnh chạy và kết quả có thể tái lập</h3>
+<pre>Baseline: aa5ea7d8ef8da4e0472b7327c81e612b64337103
+Branch: assignment/BT3-23001881-VT-051
+Test commit: 4d189a7
+PASS .\mvnw.cmd -B -ntp "-Dtest=ManagementEndpointsSecurityTest,SubmitCheckinApplicationServiceTest" test
+       Tests run: 20, Failures: 0, Errors: 0, Skipped: 0
+PASS .\mvnw.cmd -B -ntp verify
+       Tests run: 177, Failures: 0, Errors: 0, Skipped: 0
+MUTATION FAIL .\mvnw.cmd -B -ntp "-Dtest=SubmitCheckinApplicationServiceTest#rejectsATicketOutsideItsValidityWindow" test
+       expected EXPIRED_WINDOW but was ACCEPTED
+BLOCKED .\mvnw.cmd -B -ntp "-Dtest=CheckinRecordConcurrencyIT" test
+       Could not find a valid Docker environment; dockerDesktopLinuxEngine pipe unavailable
+Coverage: JaCoCo not configured. No p95 measurement obtained.</pre>
+<p><b>Chạy PostgreSQL harness:</b> từ <code>backend/ticketing-platform</code>, dùng lệnh dưới đây khi Docker Desktop Linux engine sẵn sàng. Test tự tạo PostgreSQL 16 Testcontainer và ID ngẫu nhiên; không reset database/volume local.</p>
+<pre>.\mvnw.cmd -B -ntp "-Dtest=CheckinRecordConcurrencyIT" test</pre>
+<p class="small">Tên PDF: <code>BT3_23001881_VT-051.pdf</code>. Reflection là bản nháp có AI hỗ trợ; sinh viên cần tự rà soát trước khi nộp.</p>
+</section>
+</body>
+</html>
