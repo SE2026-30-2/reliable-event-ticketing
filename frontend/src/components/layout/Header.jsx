@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from "../../contexts/useAuth";
 import { canManageEvents, hasRole } from "../../utils/permissions";
 import { userService } from '../../services/userService';
+import { LoadingOverlay, LoadingSpinner } from '../common/Loading';
 
 export default function Header({ onSearch }) {
   const { user, logout } = useAuth();
@@ -43,6 +44,12 @@ export default function Header({ onSearch }) {
 
   return (
       <header className="font-sans text-base leading-normal bg-white border-b border-slate-100 sticky top-0 z-50">
+        {signingOut && (
+          <LoadingOverlay
+            message="Đang đăng xuất..."
+            subtext="Đang hoàn tất phiên làm việc, vui lòng đợi..."
+          />
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap md:flex-nowrap gap-x-4 gap-y-3 items-center justify-between">
           {/* Brand Logo & Navigation */}
           <div className="flex min-w-0 md:flex-1 flex-wrap md:flex-nowrap items-center gap-x-6 gap-y-3">
@@ -96,13 +103,22 @@ export default function Header({ onSearch }) {
             <button
                 onClick={handleLogout}
                 disabled={signingOut}
-                className="inline-flex shrink-0 items-center whitespace-nowrap space-x-1.5 px-3 xl:px-4 py-2 text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-full transition-all"
+                className="inline-flex shrink-0 items-center whitespace-nowrap space-x-1.5 px-3 xl:px-4 py-2 text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-full transition-all disabled:opacity-70"
                 type="button"
             >
-              <svg className="w-4 h-4 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25" strokeLinecap="round" strokeLinejoin="round"></path>
-              </svg>
-              <span>Đăng xuất</span>
+              {signingOut ? (
+                <>
+                  <LoadingSpinner size="sm" color="rose" />
+                  <span>Đang đăng xuất...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25" strokeLinecap="round" strokeLinejoin="round"></path>
+                  </svg>
+                  <span>Đăng xuất</span>
+                </>
+              )}
             </button></> : <><Link to="/login" className="text-sm font-semibold text-indigo-600">Đăng nhập</Link><Link to="/register" className="text-sm font-semibold text-indigo-600">Đăng ký</Link></>}
           </div>
           <nav aria-label="Điều hướng trên điện thoại" className="flex w-full items-center gap-5 overflow-x-auto whitespace-nowrap text-sm font-semibold md:hidden [&>a]:shrink-0">
