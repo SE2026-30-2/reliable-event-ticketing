@@ -35,6 +35,7 @@ export default function Home() {
     e.preventDefault();
     setSearchTerm(searchQuery.trim());
   };
+  const visibleEvents = events.filter(event => selectedCategory === 'ALL' || event.category === selectedCategory);
 
   return (
       <div className="bg-[#f8fafc] text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between">
@@ -192,7 +193,7 @@ export default function Home() {
                 <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-center text-sm font-medium">
                   {error}
                 </div>
-            ) : events.length === 0 ? (
+            ) : visibleEvents.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm">
                   <p className="text-slate-500 font-medium">
                     Không tìm thấy sự kiện nào phù hợp.
@@ -200,7 +201,7 @@ export default function Home() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {events.map((event) => (
+                  {visibleEvents.map((event) => (
                       <EventCard key={event.eventId || event.id} event={event} />
                   ))}
                 </div>

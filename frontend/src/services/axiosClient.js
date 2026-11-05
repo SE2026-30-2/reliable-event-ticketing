@@ -53,7 +53,9 @@ const setupInterceptors = (instance) => {
                 error.message ||
                 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
 
-            return Promise.reject(new Error(message));
+            const failure = new Error(message, { cause: error });
+            Object.assign(failure, { response: error.response, config: error.config, code: error.code, isAxiosError: error.isAxiosError });
+            return Promise.reject(failure);
         }
     );
 };

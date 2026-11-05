@@ -32,3 +32,10 @@ test('checks both validity boundaries and event binding', async () => {
 test('malformed signed claims cannot grant entry', async () => {
   assert.equal((await verifyOffline(await sign({ ...claims, tid: '', vf: null }), jwks)).outcome, 'INVALID_SIGNATURE');
 });
+
+test('offline event binding compares UUID values regardless of letter case', async () => {
+  const eid = 'abcdefab-abcd-abcd-abcd-abcdefabcdef';
+  assert.equal((await verifyOffline(await sign({ ...claims, eid }), jwks, eid.toUpperCase())).outcome, 'ACCEPTED');
+  assert.equal((await verifyOffline(await sign({ ...claims, eid: eid.toUpperCase() }), jwks, eid)).outcome, 'ACCEPTED');
+  assert.equal((await verifyOffline(await sign({ ...claims, eid }), jwks, 'ABCDEFAB-ABCD-ABCD-ABCD-ABCDEFAAAAAA')).outcome, 'WRONG_EVENT');
+});

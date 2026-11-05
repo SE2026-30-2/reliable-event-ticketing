@@ -94,6 +94,20 @@ test('overview displays daily analytics, period selection and persists category 
   await expect(page.getByText('Thể thao', { exact: true }).first()).toBeVisible();
 });
 
+test('editing a categorized event cannot select an unsupported empty category', async ({ page }) => {
+  const requests = await setup(page);
+  await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('combobox', { name: 'Danh mục' })).toHaveValue('MUSIC');
+  await expect(dialog.locator('select[name="category"] option[value=""]')).toHaveJSProperty('disabled', true);
+  await dialog.getByRole('combobox', { name: 'Danh mục' }).press('Home');
+  await expect(dialog.getByRole('combobox', { name: 'Danh mục' })).toHaveValue('MUSIC');
+  await dialog.getByLabel('Tên sự kiện').fill('Giữ danh mục hiện tại');
+  await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
+  await expect(page.getByText('Đã lưu thông tin sự kiện.', { exact: true })).toBeVisible();
+  expect(requests.find((request) => request.method === 'PATCH').body.category).toBe('MUSIC');
+});
+
 test('cancel requires confirmation and disables further editing', async ({ page }) => {
   const requests = await setup(page);
   await page.getByRole('button', { name: 'Hủy sự kiện', exact: true }).click();

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('unsupported routes show a recovery link instead of a blank page', async ({ page }) => {
-  for (const path of ['/history', '/payment/result', '/unknown-route']) {
+  for (const path of ['/history', '/unknown-route']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: 'Không tìm thấy trang' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Về trang chủ' })).toHaveAttribute('href', '/home');

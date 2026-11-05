@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createServer } from 'vite';
 
 test('public auth requests omit stale tokens while protected requests retain auth handling', async () => {
-  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
+  const server = await createServer({ cacheDir: 'tmp/auth-unit-vite-cache', server: { middlewareMode: true, ws: false }, appType: 'custom' });
   const storage = new Map([['access_token', 'expired-token'], ['refresh_token', 'refresh'], ['user', '{}']]);
   const previousStorage = globalThis.localStorage;
   const previousWindow = globalThis.window;

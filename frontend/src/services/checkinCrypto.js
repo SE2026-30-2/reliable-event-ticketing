@@ -29,7 +29,7 @@ export async function verifyOffline(payload, jwks, eventId = '', now = Date.now(
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (![claims.tid, claims.eid, claims.tt].every((v) => typeof v === 'string' && uuid.test(v)) || !Number.isFinite(claims.vf) || !Number.isFinite(claims.vu)) return { outcome: 'INVALID_SIGNATURE' };
     const result = { ticketId: claims.tid, eventId: claims.eid, ticketTypeId: claims.tt, maxEntries: Number.isInteger(claims.me) && claims.me > 0 ? claims.me : 1 };
-    if (eventId && claims.eid !== eventId) return { ...result, outcome: 'WRONG_EVENT' };
+    if (eventId && claims.eid.toLowerCase() !== eventId.toLowerCase()) return { ...result, outcome: 'WRONG_EVENT' };
     if (now / 1000 < claims.vf || Math.floor(now / 1000) > claims.vu) return { ...result, outcome: 'EXPIRED_WINDOW' };
     return { ...result, outcome: 'ACCEPTED' };
   } catch { return { outcome: 'INVALID_SIGNATURE' }; }
