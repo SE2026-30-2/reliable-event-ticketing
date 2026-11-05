@@ -17,6 +17,10 @@ export interface Event {
   status: string;
   description?: string;
   bannerUrl?: string;
+  category?: string;
+  salesStartAt?: string;
+  salesEndAt?: string;
+  createdAt?: string;
 }
 export interface TicketType {
   ticketTypeId: string;

@@ -180,7 +180,7 @@ export function AccountRecovery({
             />
           </>
         )}
-        {mode === "verify" && notice && (
+        {mode === "verify" && !!notice && (
           <Button
             title="Khám phá sự kiện"
             icon="calendar"

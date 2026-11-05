@@ -1,5 +1,8 @@
 import { useRef, useState } from "react";
 import { ConfirmButton } from "./confirm-button";
+import { BannerPicker, bannerBody, type BannerAsset } from "./banner-picker";
+import { FilterOptions } from "./filter-options";
+import { categories, salesSchedule } from "@/lib/events";
 import { eventStatuses } from "@/lib/management";
 import {
   Badge,
@@ -9,7 +12,7 @@ import {
   Field,
   Heading,
 } from "@/components/ui-kit";
-import { patch, post } from "@/lib/api";
+import { endpoints, patch, post } from "@/lib/api";
 import { messageOf, type Event } from "@/lib/types";
 
 export function EventForm({
@@ -29,6 +32,11 @@ export function EventForm({
   const [ends, setEnds] = useState(event?.endsAt || "");
   const [description, setDescription] = useState(event?.description || "");
   const [banner, setBanner] = useState(event?.bannerUrl || "");
+  const [bannerAsset, setBannerAsset] = useState<BannerAsset | null>(null);
+  const [reading, setReading] = useState(false);
+  const [category, setCategory] = useState(event?.category || "");
+  const [salesStart, setSalesStart] = useState(event?.salesStartAt || "");
+  const [salesEnd, setSalesEnd] = useState(event?.salesEndAt || "");
   const [status, setStatus] = useState(event?.status || "DRAFT");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +44,7 @@ export function EventForm({
   const final = !!event && ["CANCELLED", "COMPLETED"].includes(event.status);
   const statuses = eventStatuses(event);
   async function save() {
-    if (lock.current || final) return;
+    if (lock.current || final || reading) return;
     setError("");
     if (!statuses.includes(status)) {
       setError("Không thể chuyển trạng thái sự kiện như đã chọn.");
@@ -44,6 +52,10 @@ export function EventForm({
     }
     const start = Date.parse(starts),
       end = Date.parse(ends);
+    if (!event && !category) {
+      setError("Vui lòng chọn danh mục sự kiện.");
+      return;
+    }
     if (
       !name.trim() ||
       !Number.isFinite(start) ||
@@ -58,8 +70,15 @@ export function EventForm({
       );
       return;
     }
-    if (banner && !/^https?:\/\//i.test(banner)) {
+    if (!bannerAsset && banner.trim() && !/^https?:\/\//i.test(banner.trim())) {
       setError("Ảnh bìa phải là địa chỉ http hoặc https.");
+      return;
+    }
+    let schedule;
+    try {
+      schedule = salesSchedule(salesStart, salesEnd, ends);
+    } catch (error) {
+      setError(messageOf(error));
       return;
     }
     lock.current = true;
@@ -72,9 +91,23 @@ export function EventForm({
       endsAt: new Date(end).toISOString(),
       description,
       bannerUrl: banner.trim(),
+      category: category || undefined,
+      ...schedule,
+      ...(event && !schedule.salesStartAt ? { clearSalesSchedule: true } : {}),
       status,
     };
     try {
+      if (bannerAsset) {
+        const uploaded = await post<{ url: string }>(
+          "/api/manage/event-images",
+          bannerBody(bannerAsset),
+        );
+        if (!/^\/api\/event-images\/[0-9a-f-]{36}$/i.test(uploaded?.url))
+          throw new Error("Máy chủ chưa trả đường dẫn ảnh hợp lệ.");
+        body.bannerUrl = `${endpoints.ticketing}${uploaded.url}`;
+        setBanner(body.bannerUrl);
+        setBannerAsset(null);
+      }
       if (event) await patch(`/api/event/${event.eventId}`, body);
       else await post("/api/event", body);
       onSaved();
@@ -115,6 +148,15 @@ export function EventForm({
         maxLength={255}
         editable={!busy && !final}
       />
+      <FilterOptions
+        label="Danh mục sự kiện"
+        value={category}
+        disabled={busy || final}
+        options={categories}
+        onChange={(value) => {
+          if (!busy && !final) setCategory(value);
+        }}
+      />
       <Field
         label="Bắt đầu (VD: 2026-12-20T19:00:00+07:00)"
         value={starts}
@@ -138,12 +180,41 @@ export function EventForm({
         maxLength={5000}
       />
       <Field
+        label="Ngày giờ mở bán (tùy chọn, kèm múi giờ)"
+        value={salesStart}
+        onChangeText={setSalesStart}
+        editable={!busy && !final}
+        autoCapitalize="none"
+      />
+      <Field
+        label="Ngày giờ đóng bán (tùy chọn, kèm múi giờ)"
+        value={salesEnd}
+        onChangeText={setSalesEnd}
+        editable={!busy && !final}
+        autoCapitalize="none"
+      />
+      <Heading>
+        Để trống cả hai để bán từ khi xuất bản đến khi sự kiện kết thúc.
+      </Heading>
+      <Field
         label="URL ảnh bìa"
         value={banner}
-        editable={!busy && !final}
-        onChangeText={setBanner}
+        editable={!busy && !final && !reading}
+        onChangeText={(value) => {
+          setBanner(value);
+          setBannerAsset(null);
+        }}
         autoCapitalize="none"
         maxLength={500}
+      />
+      <BannerPicker
+        value={bannerAsset?.uri || banner}
+        disabled={busy || final || reading}
+        onSelect={setBannerAsset}
+        onBusyChange={(value) => {
+          setReading(value);
+          onBusyChange?.(value);
+        }}
       />
       <Badge>{status}</Badge>
       {statuses.map((value) => (
@@ -156,14 +227,14 @@ export function EventForm({
             ] || value
           }
           onPress={() => setStatus(value)}
-          disabled={busy || final}
+          disabled={busy || final || reading}
         />
       ))}
       {event && status !== event.status ? (
         <ConfirmButton
           key={status}
           title="Lưu sự kiện"
-          disabled={busy || final}
+          disabled={busy || final || reading}
           description={
             status === "CANCELLED"
               ? `Hủy sự kiện ${event.name}? Sau khi hủy không thể xuất bản lại.`
@@ -177,7 +248,7 @@ export function EventForm({
         <Button
           title="Lưu sự kiện"
           busy={busy}
-          disabled={final}
+          disabled={final || reading}
           onPress={save}
         />
       )}
