@@ -94,3 +94,87 @@ test('screen 14 uploads a selected banner before persisting the event and reject
   await expect(page.getByText('Đã lưu sự kiện đã xuất bản.', { exact: true })).toBeVisible();
   expect(mutations[0].body.bannerUrl).toBe('http://localhost:8091/api/event-images/11111111-1111-1111-1111-111111111111');
 });
+
+async function delayOldBanner(page, stage) {
+  await page.addInitScript((stage) => {
+    if (stage === 'decode') {
+      const original = window.createImageBitmap;
+      window.createImageBitmap = async (...args) => {
+        if (args[0].name !== 'old.png') return original(...args);
+        window.oldBannerStarted = true;
+        await new Promise((resolve) => { window.releaseOldBanner = resolve; });
+        try { return await original(...args); }
+        finally { window.oldBannerFinished = true; }
+      };
+    } else {
+      const OriginalReader = window.FileReader;
+      window.FileReader = class extends OriginalReader {
+        readAsDataURL(file) {
+          if (file.name !== 'old.png') return super.readAsDataURL(file);
+          window.oldBannerStarted = true;
+          this.addEventListener('loadend', () => { window.oldBannerFinished = true; }, { once: true });
+          window.releaseOldBanner = () => super.readAsDataURL(file);
+        }
+      };
+    }
+  }, stage);
+}
+
+async function finishOldBanner(page) {
+  await page.evaluate(() => window.releaseOldBanner());
+  await page.waitForFunction(() => window.oldBannerFinished);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+}
+
+for (const stage of ['decode', 'read']) {
+  test(`screen 14 discards an old ${stage} result when switching to another event form`, async ({ page }) => {
+    await delayOldBanner(page, stage);
+    const mutations = await setup(page);
+    let uploads = 0;
+    await page.route('http://localhost:8091/api/manage/event-images', (route) => {
+      uploads++;
+      return route.fulfill({ json: { url: '/api/event-images/11111111-1111-1111-1111-111111111111' } });
+    });
+    await page.getByLabel('Tải ảnh bìa', { exact: true }).setInputFiles({ name: 'old.png', mimeType: 'image/png', buffer: await page.screenshot() });
+    await page.waitForFunction(() => window.oldBannerStarted);
+    await expect(page.getByRole('button', { name: 'Lưu nháp', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Xuất bản', exact: true })).toBeDisabled();
+    await page.getByLabel(`Thao tác với ${event.name}`).click();
+    await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).click();
+    await finishOldBanner(page);
+    await expect(page.getByAltText('Xem trước ảnh bìa sự kiện')).toHaveCount(0);
+    await expect(page.getByText('Đang đọc ảnh bìa…', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+    await expect(page.getByText('Đã lưu sự kiện đã xuất bản.', { exact: true })).toBeVisible();
+    expect(mutations[0].body.bannerUrl).toBe('');
+    expect(uploads).toBe(0);
+  });
+}
+
+test('screen 14 resets pending images even when opening the new event form again', async ({ page }) => {
+  await delayOldBanner(page, 'decode');
+  await setup(page);
+  await page.getByLabel('Tải ảnh bìa', { exact: true }).setInputFiles({ name: 'old.png', mimeType: 'image/png', buffer: await page.screenshot() });
+  await page.waitForFunction(() => window.oldBannerStarted);
+  await page.getByRole('button', { name: 'Tạo sự kiện mới', exact: true }).click();
+  await finishOldBanner(page);
+  await expect(page.getByAltText('Xem trước ảnh bìa sự kiện')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Lưu nháp', exact: true })).toBeEnabled();
+});
+
+test('screen 14 keeps the newest image if an older image finishes later', async ({ page }) => {
+  await delayOldBanner(page, 'decode');
+  await setup(page);
+  const file = page.getByLabel('Tải ảnh bìa', { exact: true });
+  const buffer = await page.screenshot();
+  await file.setInputFiles({ name: 'old.png', mimeType: 'image/png', buffer });
+  await page.waitForFunction(() => window.oldBannerStarted);
+  await file.setInputFiles({ name: 'new.png', mimeType: 'image/png', buffer });
+  const preview = page.getByAltText('Xem trước ảnh bìa sự kiện');
+  await expect(preview).toHaveAttribute('src', /^data:image\/png/);
+  await expect(page.getByRole('button', { name: 'Lưu nháp', exact: true })).toBeEnabled();
+  await page.getByLabel('Đường dẫn ảnh bìa', { exact: true }).fill('https://example.test/new-banner.png');
+  await finishOldBanner(page);
+  await expect(preview).toHaveAttribute('src', 'https://example.test/new-banner.png');
+  await expect(page.getByLabel('Đường dẫn ảnh bìa', { exact: true })).toHaveValue('https://example.test/new-banner.png');
+});

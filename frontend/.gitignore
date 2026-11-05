@@ -74,6 +74,9 @@ dist-ssr
 !/tests/live-backend.spec.mjs
 !/tests/live-cleanup.mjs
 !/tests/navigation.spec.mjs
+!/tests/buyerServices.test.mjs
+!/tests/buyer-flow.spec.mjs
+!/playwright.buyer.config.mjs
 
 # Keep the completed event management workflow and its integration checks reviewable.
 !/playwright.screens13-15.config.mjs

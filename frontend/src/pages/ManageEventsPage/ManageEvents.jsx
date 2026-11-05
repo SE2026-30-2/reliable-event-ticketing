@@ -52,6 +52,8 @@ export default function ManageEvents({ preview = false }) {
   const [notice, setNotice] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
+  const [bannerReading, setBannerReading] = useState(false)
+  const [formVersion, setFormVersion] = useState(0)
   const nameInput = useRef(null)
   const formRef = useRef(null)
   const searchInput = useRef(null)
@@ -96,6 +98,8 @@ export default function ManageEvents({ preview = false }) {
     setEditing(event)
     setForm(event ? { name: event.name, venue: event.venue || '', description: event.description || '', bannerUrl: event.bannerUrl || '', startsAt: localDate(event.startsAt), endsAt: localDate(event.endsAt), category: event.category || '', salesStartAt: localDate(event.salesStartAt), salesEndAt: localDate(event.salesEndAt) } : emptyForm)
     setBannerFile(null)
+    setBannerReading(false)
+    setFormVersion((value) => value + 1)
     setNotice(null)
     nameInput.current?.focus()
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -112,7 +116,7 @@ export default function ManageEvents({ preview = false }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (mutationLock.current) return
+    if (mutationLock.current || bannerReading) return
     const status = event.nativeEvent.submitter?.value || editing?.status || 'DRAFT'
     if (!form.name.trim() || !form.venue.trim() || !form.description.trim()) {
       setNotice({ error: true, text: 'Vui lòng nhập đầy đủ tên, mô tả và địa điểm sự kiện.' }); return
@@ -142,6 +146,7 @@ export default function ManageEvents({ preview = false }) {
       setEditing(null)
       setForm(emptyForm)
       setBannerFile(null)
+      setFormVersion((value) => value + 1)
       setTab('ALL')
       setQuery('')
       setNotice({ text: `${preview ? 'Bản xem thử: ' : ''}${status === 'PUBLISHED' ? 'Đã lưu sự kiện đã xuất bản.' : 'Đã lưu bản nháp.'}` })
@@ -156,7 +161,7 @@ export default function ManageEvents({ preview = false }) {
     try {
       const saved = preview ? { ...cancelTarget, status: 'CANCELLED' } : await manageEventService.update(cancelTarget.eventId, { status: 'CANCELLED' })
       replaceEvent(saved)
-      if (editing?.eventId === saved.eventId) { setEditing(null); setForm(emptyForm) }
+      if (editing?.eventId === saved.eventId) { setEditing(null); setForm(emptyForm); setBannerFile(null); setBannerReading(false); setFormVersion((value) => value + 1) }
       setCancelTarget(null)
       setNotice({ text: 'Đã hủy sự kiện.' })
     } catch (error) { setCancelTarget(null); setNotice({ error: true, text: managementError(error) }) }
@@ -192,8 +197,8 @@ export default function ManageEvents({ preview = false }) {
           <label className="manage-field">Địa điểm <b>*</b><input name="venue" value={form.venue} onChange={updateField} placeholder="Nhập địa điểm tổ chức..." maxLength={255} required /></label>
           <div className="manage-field">Thời gian diễn ra <b>*</b><div className="manage-date-range"><label>Từ ngày<input aria-label="Ngày giờ bắt đầu" type="datetime-local" name="startsAt" value={form.startsAt} onChange={updateField} required /></label><span aria-hidden="true">→</span><label>Đến ngày<input aria-label="Ngày giờ kết thúc" type="datetime-local" name="endsAt" value={form.endsAt} min={form.startsAt} onChange={updateField} required /></label></div><small>Theo múi giờ thiết bị: {Intl.DateTimeFormat().resolvedOptions().timeZone}</small></div>
           <div className="manage-field">Thời gian mở bán vé<div className="manage-date-range"><label>Mở bán<input aria-label="Ngày giờ mở bán" type="datetime-local" name="salesStartAt" value={form.salesStartAt} onChange={updateField} required={Boolean(form.salesEndAt)} /></label><span>→</span><label>Đóng bán<input aria-label="Ngày giờ đóng bán" type="datetime-local" name="salesEndAt" value={form.salesEndAt} min={form.salesStartAt} max={form.endsAt} onChange={updateField} required={Boolean(form.salesStartAt)} /></label></div><small>Để trống cả hai để bán ngay khi xuất bản đến lúc sự kiện kết thúc.</small></div>
-          <div className="manage-field"><label>Đường dẫn ảnh bìa<input name="bannerUrl" type="url" value={bannerFile ? '' : form.bannerUrl} onChange={updateField} placeholder="Dán đường dẫn ảnh https://..." maxLength={500} /></label><BannerUpload value={form.bannerUrl} onChange={(bannerUrl) => setForm((current) => ({ ...current, bannerUrl }))} onFile={setBannerFile} disabled={busy || !canEdit} /></div>
-          <div className="manage-form-actions">{!editing || editing.status === 'DRAFT' ? <><button className="manage-button secondary" type="submit" value="DRAFT">{busy ? 'Đang lưu…' : 'Lưu nháp'}</button><button className="manage-button primary" type="submit" value="PUBLISHED"><Icon name="send" />{busy ? 'Đang lưu…' : 'Xuất bản'}</button></> : <button className="manage-button primary" type="submit" value={editing.status}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button>}</div>
+          <div className="manage-field"><label>Đường dẫn ảnh bìa<input name="bannerUrl" type="url" value={bannerFile ? '' : form.bannerUrl} onChange={updateField} disabled={bannerReading} placeholder="Dán đường dẫn ảnh https://..." maxLength={500} /></label><BannerUpload key={formVersion} value={form.bannerUrl} onChange={(bannerUrl) => setForm((current) => ({ ...current, bannerUrl }))} onFile={setBannerFile} onReadingChange={setBannerReading} disabled={busy || !canEdit} /></div>
+          <div className="manage-form-actions">{!editing || editing.status === 'DRAFT' ? <><button className="manage-button secondary" type="submit" value="DRAFT" disabled={bannerReading}>{busy ? 'Đang lưu…' : 'Lưu nháp'}</button><button className="manage-button primary" type="submit" value="PUBLISHED" disabled={bannerReading}><Icon name="send" />{busy ? 'Đang lưu…' : 'Xuất bản'}</button></> : <button className="manage-button primary" type="submit" value={editing.status} disabled={bannerReading}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button>}</div>
           {editing && <button className="manage-reset" type="button" onClick={() => openForm()}>Bỏ chỉnh sửa</button>}
         </fieldset></form>
       </aside>

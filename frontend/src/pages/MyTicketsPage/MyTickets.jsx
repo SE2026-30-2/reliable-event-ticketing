@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
+import TicketQr from "../../components/tickets/TicketQr";
 import { ticketService } from "../../services/ticketService";
 import { eventService } from "../../services/eventService";
 
@@ -41,7 +42,7 @@ export default function MyTickets() {
     const loadData = async () => {
         try {
             const [ticketsRes, waitlistRes] = await Promise.all([
-                ticketService.getMyTickets(),
+                ticketService.getAllMyTickets(),
                 ticketService.getMyWaitlist().catch(() => [])
             ]);
 
@@ -106,11 +107,11 @@ export default function MyTickets() {
     };
 
     // 3. Gọi API rời khỏi danh sách chờ
-    const handleLeaveWaitlist = async (waitlistId) => {
-        if (!window.confirm("Bạn có chắc chắn muốn rời khỏi danh sách chờ này?")) return;
+    const handleLeaveWaitlist = async (waitlistId, confirm = true) => {
+        if (confirm && !window.confirm("Bạn có chắc chắn muốn rời khỏi danh sách chờ này?")) return;
         try {
             await ticketService.leaveWaitlist(waitlistId);
-            setWaitlist((prev) => prev.filter((item) => item.id !== waitlistId));
+            setWaitlist((prev) => prev.filter((item) => item.entryId !== waitlistId));
             alert("Đã rời khỏi danh sách chờ thành công.");
         } catch (err) {
             alert(err.message || "Có lỗi xảy ra khi hủy vị trí chờ.");
@@ -120,7 +121,7 @@ export default function MyTickets() {
     // 4. Từ chối nhận vé được cấp (OFFERED)
     const handleRejectOffer = async (waitlistId) => {
         if (!window.confirm("Nếu bạn từ chối, vé sẽ được nhường cho người tiếp theo trong hàng đợi.")) return;
-        handleLeaveWaitlist(waitlistId);
+        await handleLeaveWaitlist(waitlistId, false);
     };
 
     // 5. Gọi API Chuyển nhượng vé
@@ -295,7 +296,7 @@ export default function MyTickets() {
                                                     {renderStatusBadge(ticket.status, ticket.statusReason)}
                                                 </div>
 
-                                                <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                                                <div className="flex flex-col items-stretch gap-4 border-t border-slate-100 pt-2.5">
                                                     <div className="space-y-1 text-[11px] text-slate-500 flex-1 pr-2 min-w-0">
                                                         <div className="flex items-center gap-1.5 truncate">
                                                             <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
@@ -307,20 +308,8 @@ export default function MyTickets() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="text-center pl-2 border-l border-dashed border-slate-200 shrink-0">
-                                                        <div className={`w-16 h-16 border border-slate-200 rounded-xl p-1 mx-auto bg-white flex items-center justify-center ${ticket.status === 'CANCELLED' || ticket.status === 'REFUNDED' ? 'opacity-40 grayscale' : ''}`}>
-                                                            <svg className="w-full h-full text-slate-800" fill="currentColor" viewBox="0 0 100 100">
-                                                                <rect fill="none" height="28" rx="2" stroke="currentColor" strokeWidth="6" width="28" x="5" y="5"></rect>
-                                                                <rect height="12" width="12" x="13" y="13"></rect>
-                                                                <rect fill="none" height="28" rx="2" stroke="currentColor" strokeWidth="6" width="28" x="67" y="5"></rect>
-                                                                <rect height="12" width="12" x="75" y="13"></rect>
-                                                                <rect fill="none" height="28" rx="2" stroke="currentColor" strokeWidth="6" width="28" x="5" y="67"></rect>
-                                                                <rect height="12" width="12" x="13" y="75"></rect>
-                                                                <rect height="8" width="8" x="42" y="10"></rect>
-                                                                <rect height="16" width="16" x="42" y="42"></rect>
-                                                                <rect height="18" width="18" x="72" y="72"></rect>
-                                                            </svg>
-                                                        </div>
+                                                    <div className="text-center self-center max-w-full">
+                                                        <TicketQr ticket={ticket} size={256} />
                                                         <p className="text-[9px] text-slate-400 font-mono mt-1">#{ticket.code}</p>
                                                     </div>
                                                 </div>
@@ -497,7 +486,7 @@ export default function MyTickets() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {waitlist.map((item) => (
                                     <article
-                                        key={item.id || item.waitlistId}
+                                        key={item.entryId}
                                         className={`border rounded-2xl p-4 flex flex-col justify-between transition ${
                                             item.status === "OFFERED"
                                                 ? "border-emerald-200 bg-emerald-50/20"
@@ -515,7 +504,7 @@ export default function MyTickets() {
                                                         </span>
                                                     ) : (
                                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span> OFFERED
+                                                            {item.status}
                                                         </span>
                                                     )}
                                                 </div>
@@ -530,33 +519,34 @@ export default function MyTickets() {
                                                         <span className="text-xl font-black text-[#4353ff]">#{item.position || 1}</span>
                                                     </div>
                                                     <button
-                                                        onClick={() => handleLeaveWaitlist(item.id || item.waitlistId)}
+                                                        onClick={() => handleLeaveWaitlist(item.entryId)}
                                                         className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50/50 transition"
                                                     >
                                                         Rời danh sách
                                                     </button>
                                                 </>
-                                            ) : (
+                                            ) : item.status === 'OFFERED' ? (
                                                 <>
                                                     <div className="flex items-center space-x-1.5 text-emerald-700 bg-emerald-100/70 px-2.5 py-1 rounded-lg text-xs font-bold">
                                                         <span>🎉 Đã có vé cho bạn!</span>
                                                     </div>
                                                     <div className="flex items-center space-x-2">
                                                         <button
-                                                            onClick={() => navigate(`/checkout/${item.eventId}`)}
+                                                            disabled={!item.reservationId}
+                                                            onClick={() => navigate(`/checkout/${encodeURIComponent(item.reservationId)}`)}
                                                             className="px-3.5 py-1.5 rounded-xl bg-[#4353ff] text-white text-xs font-extrabold hover:bg-indigo-700 shadow-xs transition"
                                                         >
                                                             Thanh toán ngay
                                                         </button>
                                                         <button
-                                                            onClick={() => handleRejectOffer(item.id || item.waitlistId)}
+                                                            onClick={() => handleRejectOffer(item.entryId)}
                                                             className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:text-red-600 hover:border-red-200 transition"
                                                         >
                                                             Từ chối
                                                         </button>
                                                     </div>
                                                 </>
-                                            )}
+                                            ) : <span className="text-xs text-slate-500">{item.status === 'CONVERTED' ? 'Đã hoàn tất đặt vé' : item.status === 'EXPIRED' ? 'Lời mời đã hết hạn' : 'Đã rời danh sách chờ'}</span>}
                                         </div>
                                     </article>
                                 ))}

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
-import { paymentService } from "../../services/paymentService";
+import { paymentService, validatePayment } from "../../services/paymentService";
 
 export default function PaymentGateway() {
     const location = useLocation();
@@ -21,86 +21,50 @@ export default function PaymentGateway() {
         ? Math.round(amountCents / 100).toLocaleString("vi-VN") + "đ"
         : "0đ";
 
-    const [timeLeft, setTimeLeft]         = useState(900);
+    const expiresAt = Date.parse(bookingData.expiresAt);
+    const [now, setNow] = useState(Date.now);
+    const timeLeft = Number.isFinite(expiresAt) ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : null;
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
-    const pollingRef = useRef(null);
-
-    const qrCodeUrl = paymentUrl
-        ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(paymentUrl)}`
-        : null;
+    const checking = useRef(false), controllerRef = useRef(null);
 
     useEffect(() => {
-        if (timeLeft <= 0) return;
-        const t = setInterval(() => setTimeLeft((p) => p - 1), 1000);
+        const t = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(t);
-    }, [timeLeft]);
+    }, []);
 
-    // Polling định kỳ kiểm tra trạng thái từ VNPay
-    useEffect(() => {
-        if (!txnRef || timeLeft <= 0) return;
-
-        const checkStatus = async () => {
-            try {
-                const result = await paymentService.syncPaymentStatus(txnRef);
-                const status = result?.status;
-                if (status === "COMPLETED") {
-                    clearInterval(pollingRef.current);
-                    navigate("/payment-result", {
-                        state: {
-                            ...bookingData,
-                            status: "success",
-                            paidAt: result.completedAt || new Date().toISOString(),
-                            transactionId: result.txnRef || txnRef,
-                        }
-                    });
-                } else if (status === "FAILED" || status === "REFUND_REQUIRED") {
-                    clearInterval(pollingRef.current);
-                    navigate("/payment-result", {
-                        state: {
-                            ...bookingData,
-                            status: "failed",
-                            failureReason: result.failureReason || "Giao dịch không thành công.",
-                        }
-                    });
-                }
-            } catch {
-                // Bỏ qua lỗi mạng khi polling
-            }
-        };
-
-        pollingRef.current = setInterval(checkStatus, 3000);
-        return () => clearInterval(pollingRef.current);
-    }, [txnRef, timeLeft, navigate, bookingData]);
-
-    const handleConfirm = async () => {
-        if (!txnRef) return;
-        setIsProcessing(true);
-        setErrorMessage("");
+    const checkStatus = useCallback(async (manual = false) => {
+        if (!txnRef || checking.current || !controllerRef.current || controllerRef.current.signal.aborted) return;
+        checking.current = true;
+        const signal = controllerRef.current.signal;
+        if (manual) { setIsProcessing(true); setErrorMessage(''); }
         try {
-            const result = await paymentService.syncPaymentStatus(txnRef);
-            if (result?.status === "COMPLETED") {
-                navigate("/payment-result", {
-                    state: {
-                        ...bookingData,
-                        status: "success",
-                        paidAt: result.completedAt || new Date().toISOString(),
-                        transactionId: result.txnRef || txnRef,
-                    }
-                });
-            } else if (result?.status === "FAILED") {
-                navigate("/payment-result", {
-                    state: { ...bookingData, status: "failed", failureReason: result.failureReason }
-                });
-            } else {
-                setErrorMessage("Hệ thống chưa nhận được khoản thanh toán. Vui lòng kiểm tra lại ứng dụng ngân hàng.");
+            const result = validatePayment(await paymentService.syncPaymentStatus(txnRef, { signal }), bookingData.reservationId);
+            if (result.txnRef !== txnRef) throw new Error('Phản hồi không khớp mã giao dịch.');
+            if (signal.aborted) return;
+            if (result.status !== 'PENDING') {
+                const params = new URLSearchParams({ vnp_TxnRef: txnRef, reservationId: result.reservationId });
+                navigate(`/payment/result?${params}`, { state: { ...bookingData, payment: result } });
+            } else if (manual) {
+                setErrorMessage('Giao dịch đang chờ xác nhận từ máy chủ. Vui lòng kiểm tra lại sau.');
             }
         } catch (err) {
-            setErrorMessage(err.message || "Lỗi xác thực giao dịch.");
+            if (!signal.aborted) setErrorMessage(err.message || 'Chưa xác nhận được giao dịch.');
         } finally {
-            setIsProcessing(false);
+            checking.current = false;
+            if (!signal.aborted) setIsProcessing(false);
         }
-    };
+    }, [txnRef, navigate, bookingData]);
+
+    useEffect(() => {
+        const controller = new AbortController(); controllerRef.current = controller;
+        let timer;
+        const poll = async () => { await checkStatus(); if (!controller.signal.aborted) timer = setTimeout(poll, 3000); };
+        if (txnRef) timer = setTimeout(poll, 3000);
+        return () => { controller.abort(); clearTimeout(timer); };
+    }, [txnRef, checkStatus]);
+
+    const handleConfirm = () => checkStatus(true);
 
     const formatCountdown = (s) => {
         const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -108,7 +72,7 @@ export default function PaymentGateway() {
         return `${m}:${sec}`;
     };
 
-    if (!txnRef && !paymentUrl) {
+        if (!txnRef && !paymentUrl) {
         return (
             <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between">
                 <Header />
@@ -131,7 +95,7 @@ export default function PaymentGateway() {
             <main className="max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
                 <div className="mb-6">
                     <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Cổng thanh toán an toàn</h1>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">Quét mã QR bằng ứng dụng ngân hàng hoặc ví VNPay để hoàn tất đơn hàng.</p>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">Mở trang VNPay để chọn ngân hàng, thẻ hoặc quét QR thanh toán.</p>
                 </div>
 
                 {errorMessage && (
@@ -146,17 +110,17 @@ export default function PaymentGateway() {
                         <div className="bg-amber-50/80 border border-amber-200/70 rounded-2xl p-4 flex items-center justify-between">
                             <div>
                                 <p className="text-[11px] font-bold text-amber-700 uppercase">Thời gian còn lại</p>
-                                <p className="text-lg font-black text-amber-800 font-mono">{formatCountdown(timeLeft)}</p>
+                                <p className="text-lg font-black text-amber-800 font-mono">{timeLeft === null ? 'Theo thời hạn trên VNPay' : formatCountdown(timeLeft)}</p>
                             </div>
                             <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">Đang chờ chuyển khoản</span>
                         </div>
 
                         <div className="flex flex-col items-center justify-center p-6 bg-slate-50/60 rounded-2xl border border-slate-100 space-y-4">
                             <div className="relative w-56 h-56 bg-white p-3 rounded-2xl border-2 border-[#4353ff] shadow-md flex items-center justify-center overflow-hidden">
-                                {qrCodeUrl ? (
-                                    <img src={qrCodeUrl} alt="VNPay QR Code" className="w-full h-full object-contain" />
+                                {paymentUrl && /^https?:\/\//i.test(paymentUrl) ? (
+                                    <a href={paymentUrl} className="text-center text-indigo-700 font-bold underline">Mở trang thanh toán VNPay</a>
                                 ) : (
-                                    <p className="text-xs text-slate-400">Không thể tạo mã QR.</p>
+                                    <p className="text-xs text-slate-400">Chưa có đường dẫn thanh toán hợp lệ. Vui lòng kiểm tra lại đơn.</p>
                                 )}
                             </div>
                             <div className="text-center space-y-1">
@@ -168,7 +132,7 @@ export default function PaymentGateway() {
                         <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                             <button
                                 onClick={handleConfirm}
-                                disabled={isProcessing || timeLeft <= 0}
+                                disabled={isProcessing || !txnRef}
                                 className="w-full sm:flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-[#4353ff] to-indigo-600 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2"
                                 type="button"
                             >

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
@@ -33,9 +33,13 @@ export default function EventDetail({ currentUser: propUser }) {
     const [bannerFailed, setBannerFailed] = useState(false);
 
     // Dynamic Quote & Submitting States
-    const [quote, setQuote] = useState(null);
-    const [loadingQuote, setLoadingQuote] = useState(false);
+    const [quoteState, setQuoteState] = useState(null);
+    const quoteKey = JSON.stringify([selectedTicketId, quantity, appliedCoupon]);
+    const quote = quoteState?.key === quoteKey ? quoteState.data : null;
+    const quoteError = quoteState?.key === quoteKey ? quoteState.error : '';
+    const loadingQuote = Boolean(selectedTicketId && quoteState?.key !== quoteKey);
     const [submitting, setSubmitting] = useState(false);
+    const submittingRef = useRef(false);
 
     // Helper: Chuyển đổi priceCents từ backend sang VNĐ
     const getTicketPrice = (ticket) => {
@@ -48,14 +52,18 @@ export default function EventDetail({ currentUser: propUser }) {
 
     // 1. Fetch Event Info & Ticket Types list
     useEffect(() => {
+        const controller = new AbortController();
         const fetchEventData = async () => {
             setLoading(true);
+            setError('');
             try {
                 const [eventData, ticketsData] = await Promise.all([
-                    eventService.getEventById(eventId),
-                    eventService.getTicketTypesByEventId(eventId)
+                    eventService.getEventById(eventId, { signal: controller.signal }),
+                    eventService.getTicketTypesByEventId(eventId, { signal: controller.signal })
                 ]);
+                if (controller.signal.aborted) return;
                 setEvent(eventData);
+                setBannerFailed(false);
                 if (eventData.status === 'PUBLISHED' && viewed.current !== eventId) {
                     viewed.current = eventId;
                     void eventService.recordView(eventId).catch(() => {});
@@ -67,16 +75,18 @@ export default function EventDetail({ currentUser: propUser }) {
                     setSelectedTicketId(list[0].ticketTypeId || list[0].id);
                 }
             } catch (err) {
+                if (controller.signal.aborted) return;
                 console.error("Lỗi khi tải thông tin sự kiện:", err);
                 setError("Không thể tải thông tin sự kiện. Vui lòng thử lại sau.");
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
         if (eventId) {
             fetchEventData();
         }
+        return () => controller.abort();
     }, [eventId]);
 
     // Active Ticket Type Object
@@ -87,60 +97,24 @@ export default function EventDetail({ currentUser: propUser }) {
     // Check if item is out of stock for current quantity
     const isWaitlistMode = useMemo(() => {
         if (!selectedTicket) return false;
-        return (selectedTicket.remaining ?? 0) < quantity;
+        return (selectedTicket.remaining ?? 0) < quantity * (selectedTicket.bundleSize || 1);
     }, [selectedTicket, quantity]);
 
-    // 2. Fetch Realtime Quote via API (GET /api/ticket-types/:id/quote)
-    const fetchQuote = useCallback(async (ticketTypeId, qty, couponCode) => {
-        if (!ticketTypeId) return;
-        setLoadingQuote(true);
-        try {
-            const quoteData = await eventService.getTicketQuote(ticketTypeId, qty, couponCode);
-
-            if (quoteData) {
-                // Quy đổi từ Cents sang VNĐ (chia 100)
-                const grossVnd = (quoteData.grossCents ?? 0) / 100;
-                const discountVnd = (quoteData.discountCents ?? 0) / 100;
-                const totalVnd = (quoteData.totalCents ?? 0) / 100;
-
-                // Nếu API trả về dữ liệu hợp lệ (> 0)
-                if (grossVnd > 0 || totalVnd > 0) {
-                    setQuote({
-                        originalPrice: grossVnd,
-                        discountAmount: discountVnd,
-                        finalPrice: totalVnd,
-                    });
-                    return;
-                }
-            }
-            throw new Error("Báo giá từ API bằng 0, chuyển sang fallback client.");
-        } catch (err) {
-            console.warn("Lỗi khi lấy báo giá từ server, sử dụng fallback client:", err);
-            // Fallback tính toán tại Client nếu API gặp sự cố
-            if (selectedTicket) {
-                const unitPrice = getTicketPrice(selectedTicket);
-                const originalTotal = unitPrice * qty;
-                const discount = couponCode ? originalTotal * 0.1 : 0;
-
-                setQuote({
-                    originalPrice: originalTotal,
-                    discountAmount: discount,
-                    finalPrice: originalTotal - discount,
-                });
-            }
-        } finally {
-            setLoadingQuote(false);
-        }
-    }, [selectedTicket]);
-
-    // Recalculate Quote when ticket, quantity, or applied coupon changes
+    // Only a server quote for the current selection can enable a purchase.
     useEffect(() => {
-        if (selectedTicketId) {
-            // This starts an async request whose loading state is managed by fetchQuote.
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            fetchQuote(selectedTicketId, quantity, appliedCoupon);
-        }
-    }, [selectedTicketId, quantity, appliedCoupon, fetchQuote]);
+        if (!selectedTicketId) return;
+        const controller = new AbortController();
+        eventService.getTicketQuote(selectedTicketId, quantity, appliedCoupon, { signal: controller.signal }).then((data) => {
+            if (![data?.grossCents, data?.discountCents, data?.totalCents].every(value => Number.isSafeInteger(value) && value >= 0)
+                || data.totalCents !== data.grossCents - data.discountCents) throw new Error('Báo giá từ máy chủ không hợp lệ.');
+            if (!controller.signal.aborted) setQuoteState({ key: quoteKey, data: {
+                ...data, originalPrice: data.grossCents / 100, discountAmount: data.discountCents / 100, finalPrice: data.totalCents / 100,
+            } });
+        }).catch((failure) => {
+            if (!controller.signal.aborted) setQuoteState({ key: quoteKey, error: failure.message || 'Không tải được báo giá. Vui lòng thử lại.' });
+        });
+        return () => controller.abort();
+    }, [selectedTicketId, quantity, appliedCoupon, quoteKey]);
 
     const formatDate = (dateString) => {
         if (!dateString) return "";
@@ -165,6 +139,7 @@ export default function EventDetail({ currentUser: propUser }) {
 
     // 3. Main Action Handler: Reservation or Waitlist
     const handleAction = async () => {
+        if (submittingRef.current || (!isWaitlistMode && !quote)) return;
         if (!currentUser) {
             alert("Vui lòng đăng nhập để thực hiện đặt vé hoặc tham gia danh sách chờ!");
             navigate("/login", { state: { from: `/event/${eventId}` } });
@@ -182,60 +157,63 @@ export default function EventDetail({ currentUser: propUser }) {
             return;
         }
 
+        submittingRef.current = true;
         setSubmitting(true);
         try {
             if (isWaitlistMode) {
                 // Call Waitlist API: POST /api/ticket-types/:id/waitlist
                 await eventService.joinWaitlist(selectedTicketId, {
                     quantity,
-                    holderName: formFullName,
-                    holderEmail: formEmail
+                    holderName: formFullName.trim(),
+                    holderEmail: formEmail.trim()
                 });
                 alert("Bạn đã tham gia danh sách chờ thành công! Chúng tôi sẽ thông báo qua Email khi có vé.");
             } else {
                 // Call Reservation API: POST /api/ticket-types/:id/reservations
                 const reservation = await eventService.createReservation(selectedTicketId, {
                     quantity,
-                    holderName: fullName,
-                    holderEmail: email,
+                    holderName: formFullName.trim(),
+                    holderEmail: formEmail.trim(),
                     couponCode: appliedCoupon
                 });
 
-                                const unitPrice = getTicketPrice(selectedTicket);
-                const fallbackPrice = unitPrice * quantity;
-                const reservationId = reservation?.reservationId || reservation?.id;
-                const finalTotal = quote?.finalPrice ?? fallbackPrice;
+                if (!reservation?.reservationId || !reservation.tickets?.length || !Number.isSafeInteger(reservation.totalCents) || reservation.totalCents < 0) {
+                    throw new Error('Chưa xác nhận được đơn đặt chỗ. Hãy kiểm tra Vé của tôi trước khi đặt lại.');
+                }
+                const unitPrice = getTicketPrice(selectedTicket);
+                const reservationId = reservation.reservationId;
                 const ticketName = selectedTicket?.name || selectedTicket?.ticketTypeName || "Vé tiêu chuẩn";
 
                 // Navigate to Checkout Page
-                navigate(`/checkout/${eventId}`, {
+                navigate(`/checkout/${encodeURIComponent(reservationId)}`, {
                     state: {
                         eventId,
                         event,
                         reservationId: reservationId,
+                        tickets: reservation.tickets,
+                        amountCents: reservation.totalCents,
+                        discountCents: reservation.discountCents,
                         orderCode: reservationId ? "RES-" + String(reservationId).slice(0, 8).toUpperCase() : "EH" + Date.now().toString().slice(-8),
                         ticketType: ticketName,
                         selectedTicket,
                         packageInfo: "Gói tiêu chuẩn",
-                        quantity,
+                        quantity: reservation.tickets.length,
+                        units: quantity,
                         pricePerTicket: unitPrice,
-                        totalAmount: finalTotal,
+                        totalAmount: reservation.totalCents / 100,
                         customerName: formFullName,
                         customerEmail: formEmail,
                         holderName: formFullName,
                         holderEmail: formEmail,
-                        quote: quote || {
-                            originalPrice: fallbackPrice,
-                            discountAmount: 0,
-                            finalPrice: fallbackPrice
-                        }
+                        quote,
                     }
                 });
             }
         } catch (err) {
             console.error("Thao tác thất bại:", err);
-            alert(err.response?.data?.message || "Đã xảy ra lỗi trong quá trình xử lý. Vui lòng thử lại!");
+            alert(err.response?.data?.message || err.message || "Đã xảy ra lỗi trong quá trình xử lý. Vui lòng thử lại!");
         } finally {
+            submittingRef.current = false;
             setSubmitting(false);
         }
     };
@@ -513,7 +491,7 @@ export default function EventDetail({ currentUser: propUser }) {
                                                     {quote.finalPrice === 0 ? "0đ (Miễn phí)" : `${(quote.finalPrice || 0).toLocaleString("vi-VN")}đ`}
                                                 </div>
                                             </>
-                                        ) : null}
+                                        ) : quoteError ? <p role="alert" className="text-xs text-rose-700">{quoteError}</p> : null}
                                     </div>
                                 </div>
 
@@ -541,7 +519,7 @@ export default function EventDetail({ currentUser: propUser }) {
                                 {/* Action Button (Dynamic: Reservation / Free / Waitlist) */}
                                 <button
                                     onClick={handleAction}
-                                    disabled={submitting || !selectedTicket}
+                                    disabled={submitting || !selectedTicket || (!isWaitlistMode && (loadingQuote || !quote))}
                                     className={`w-full py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
                                         isWaitlistMode
                                             ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/25"

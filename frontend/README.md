@@ -1,5 +1,32 @@
 # React + Vite
 
+## Buyer workflow checks
+
+The checkout URL is `/checkout/:reservationId`. Both `/payment/result` and
+`/payment-result` open the server-verified payment result. Email links can recover
+owned reservations through the existing ticket API, including later API pages.
+
+Run `npm ci`, `npm run lint`, `npm run test:unit`, and `npm run build` before
+`npm run test:buyer:browser`. The browser suite uses mocked APIs and decodes the
+ticket QR images with jsQR; it does not create real payments.
+
+On Windows, run a separate preview server to avoid the web-server shutdown hang:
+
+```powershell
+node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5189 --strictPort
+```
+
+Then, in another terminal:
+
+```powershell
+$env:BUYER_TEST_PORT = '5189'
+$env:BUYER_REUSE_TEST_SERVER = '1'
+npm run test:buyer:browser
+```
+
+Ticket QR images are generated locally with `qrcode`, using only server-issued
+ticket payloads. They are not sent to an external QR image endpoint.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
