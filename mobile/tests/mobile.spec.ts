@@ -257,6 +257,9 @@ test("account recovery submits backend contracts and validates password confirma
   await page
     .getByRole("button", { name: "Quên mật khẩu", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "Quên mật khẩu", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("textbox", { name: "Email", exact: true })
     .fill(profile.email);
