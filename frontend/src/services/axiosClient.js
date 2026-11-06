@@ -20,7 +20,7 @@ const setupInterceptors = (instance) => {
     instance.interceptors.request.use(
         (config) => {
             // Các API Auth công khai không cần gửi Token
-            const isAuthRequest = config.skipAuth || config.url?.includes('/api/user/login') || config.url?.includes('/api/user/register');
+            const isAuthRequest = config.skipAuth || config.url?.includes('/api/user/login') || config.url?.includes('/api/user/register') || config.url?.includes('/api/user/password/forgot') || config.url?.includes('/api/user/password/reset') || (config.url?.includes('/api/user/email/verify') && !config.url?.includes('/api/user/email/verify/resend'));
 
             const token = config.accessToken ?? localStorage.getItem('access_token');
             if (isAuthRequest) config.headers.delete('Authorization');
@@ -35,7 +35,7 @@ const setupInterceptors = (instance) => {
     instance.interceptors.response.use(
         (response) => response.data,
         (error) => {
-            const isAuthRequest = error.config?.skipAuth || error.config?.url?.includes('/api/user/login') || error.config?.url?.includes('/api/user/register');
+            const isAuthRequest = error.config?.skipAuth || error.config?.url?.includes('/api/user/login') || error.config?.url?.includes('/api/user/register') || error.config?.url?.includes('/api/user/password/forgot') || error.config?.url?.includes('/api/user/password/reset') || (error.config?.url?.includes('/api/user/email/verify') && !error.config?.url?.includes('/api/user/email/verify/resend'));
 
             // Bỏ qua xóa token/bắn event nếu lỗi 401 đến từ trang Login hoặc Register
             if (error.response?.status === 401 && !isAuthRequest) {

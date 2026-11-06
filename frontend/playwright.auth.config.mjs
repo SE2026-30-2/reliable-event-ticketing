@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 // Use the origin allowed by the local backend's CORS configuration.
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'auth-login.spec.mjs',
+  testMatch: /(?:auth-login|auth-extended)\.spec\.mjs/,
   workers: 1,
   timeout: 30000,
   outputDir: 'tmp/auth-results',
