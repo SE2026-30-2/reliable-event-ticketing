@@ -182,13 +182,16 @@ export default function ManageEvents({ preview = false }) {
             return <li key={event.eventId} className={editing?.eventId === event.eventId ? 'selected' : ''}>
               <div className={`manage-thumbnail art-${index % 6}`}>{event.bannerUrl ? <img src={event.bannerUrl} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} /> : <span aria-hidden="true">{event.art || '♫'}</span>}</div>
               <div className="manage-event-info"><h2><Link to={`${preview ? '/manage/preview/events' : '/manage/events'}/${encodeURIComponent(event.eventId)}`}>{event.name}</Link></h2><p><time dateTime={event.startsAt}>{new Date(event.startsAt).toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' })}</time><span className="manage-dot">•</span>{event.venue || 'Chưa có địa điểm'}</p><p className="manage-sales"><Icon name="ticket" />{count ? `${number.format(count.sold)} / ${number.format(count.quota)} vé đã bán` : 'Chưa tải được số liệu vé'}</p></div>
-              <span className={`manage-status ${event.status.toLowerCase()}`}>{event.status}</span>
+              <div className="manage-event-actions"><span className={`manage-status ${event.status.toLowerCase()}`}>{event.status}</span>
+              <Link className="manage-ticket-button" to={`${preview ? '/manage/preview/events' : '/manage/events'}/${encodeURIComponent(event.eventId)}?tab=types`}><Icon name="ticket" /><span>Quản lý loại vé</span></Link>
               {['DRAFT', 'PUBLISHED'].includes(event.status) && <details className="manage-row-menu"><summary aria-label={`Thao tác với ${event.name}`}>•••</summary><div><button type="button" disabled={busy} onClick={(e) => { e.currentTarget.closest('details').open = false; openForm(event) }}>Chỉnh sửa{event.status === 'DRAFT' ? ' / Xuất bản' : ''}</button><button type="button" className="danger" disabled={busy} onClick={(e) => { e.currentTarget.closest('details').open = false; setCancelTarget(event) }}>Hủy sự kiện</button></div></details>}
+              </div>
             </li>
           })}</ul>}
         </div>
       </section>
       <aside className="manage-form-panel" ref={formRef} aria-labelledby="event-form-title"><h2 id="event-form-title"><Icon name="ticket" />{editing ? 'Chỉnh sửa sự kiện' : 'Tạo sự kiện mới'}</h2><p className="manage-form-subtitle">Điền thông tin chi tiết để {editing ? 'cập nhật' : 'tạo'} sự kiện của bạn.</p>
+        {editing && <div className="manage-ticket-card"><div><strong>Vé & giá bán</strong><p>Thêm loại vé, thiết lập giá và số lượng.</p></div><Link className="manage-ticket-button" to={`${preview ? '/manage/preview/events' : '/manage/events'}/${encodeURIComponent(editing.eventId)}?tab=types`}><Icon name="ticket" /><span>Quản lý loại vé</span></Link><small>Lưu thay đổi sự kiện trước khi chuyển trang.</small></div>}
         {notice && <div className={`manage-notice ${notice.error ? 'error' : ''}`} role={notice.error ? 'alert' : 'status'}>{notice.text}</div>}
         <form onSubmit={submit}><fieldset disabled={busy || !canEdit}>
           <label className="manage-field">Tên sự kiện <b>*</b><input ref={nameInput} name="name" value={form.name} onChange={updateField} placeholder="Nhập tên sự kiện..." required maxLength={255} /></label>

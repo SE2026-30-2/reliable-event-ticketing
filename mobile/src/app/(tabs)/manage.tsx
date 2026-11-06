@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { View } from "react-native";
 import {
   Body,
   Button,
@@ -122,7 +123,20 @@ function ManageContent() {
             )}
             <Body muted>{events.length} sự kiện phù hợp</Body>
             {events.slice(0, limit).map((event) => (
-              <EventCard key={event.eventId} event={event} manage />
+              <View key={event.eventId} style={{ gap: 8, marginBottom: 6 }}>
+                <EventCard event={event} manage />
+                <Button
+                  secondary
+                  icon="ticket"
+                  title="Quản lý loại vé"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/manage/[id]",
+                      params: { id: event.eventId, tab: "types" },
+                    })
+                  }
+                />
+              </View>
             ))}
             {events.length > limit && (
               <Button

@@ -61,6 +61,22 @@
 .manage-status.published { background: #def8ed; color: #00975a; }
 .manage-status.draft { background: #ece9ff; color: #5845ff; }
 .manage-status.cancelled { background: #ffe8eb; color: #f0374c; }
+.manage-ticket-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex-shrink: 0; min-height: 38px; padding: 9px 12px; border: 1px solid #ded9ff; border-radius: 10px; background: #f5f3ff; color: #5140dc; font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s, box-shadow .15s; }
+.manage-ticket-button svg { width: 16px; height: 16px; }
+.manage-ticket-button:hover { background: #ebe7ff; border-color: #b9adff; box-shadow: 0 3px 10px #5845ff12; }
+.manage-ticket-button:active { background: #e1daff; }
+.manage-event-actions { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; flex: 0 0 145px; }
+.manage-event-actions .manage-status { margin: 0; justify-self: start; align-self: center; }
+.manage-event-actions .manage-row-menu { grid-column: 2; grid-row: 1; margin: 0; }
+.manage-event-actions .manage-row-menu summary { padding: 4px; }
+.manage-event-actions .manage-ticket-button { grid-column: 1 / -1; grid-row: 2; }
+.manage-ticket-card { display: grid; gap: 12px; margin-bottom: 24px; padding: 16px; border: 1px solid #e6e1ff; border-radius: 12px; background: linear-gradient(135deg, #faf9ff, #f2f0ff); }
+.manage-ticket-card strong { font-size: 13px; color: var(--ink); }
+.manage-ticket-card p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.manage-ticket-card small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.manage-ticket-card .manage-ticket-button { background: white; }
+@media (max-width: 600px) { .manage-event-actions { flex: 1 1 calc(100% - 92px); margin-left: 92px; } }
+@media (min-width: 780px) and (max-width: 999px) { .manage-event-actions { flex: 1 1 calc(100% - 110px); margin-left: 110px; } }
 .manage-row-menu { flex-shrink: 0; position: relative; }
 .manage-row-menu summary { list-style: none; padding: 10px 0 10px 4px; letter-spacing: 1px; color: #31308a; }
 .manage-page summary::-webkit-details-marker { display: none; }

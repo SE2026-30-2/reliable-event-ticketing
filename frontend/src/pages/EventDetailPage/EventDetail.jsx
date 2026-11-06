@@ -375,7 +375,7 @@ export default function EventDetail({ currentUser: propUser }) {
                             {/* Ticket Types List / Selector */}
                             <div className="space-y-3">
                                 {ticketTypes.length === 0 ? (
-                                    <p className="text-xs text-slate-500">Chưa có thông tin vé cho sự kiện này.</p>
+                                    <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3">Ban tổ chức chưa tạo loại vé cho sự kiện này. Bạn chưa thể đặt vé, vui lòng quay lại sau.</p>
                                 ) : (
                                     ticketTypes.map((ticket) => {
                                         const ticketId = ticket.ticketTypeId || ticket.id;
@@ -517,10 +517,12 @@ export default function EventDetail({ currentUser: propUser }) {
                                 </div>
 
                                 {/* Action Button (Dynamic: Reservation / Free / Waitlist) */}
+                                {selectedTicket && loadingQuote && !isWaitlistMode && <p role="status" className="text-sm text-slate-600">Đang tải báo giá trước khi đặt vé…</p>}
+                                {selectedTicket && quoteError && !isWaitlistMode && <p role="alert" className="text-sm text-rose-700">Chưa thể đặt vé vì không tải được báo giá. Hãy kiểm tra mã giảm giá hoặc tải lại trang.</p>}
                                 <button
                                     onClick={handleAction}
                                     disabled={submitting || !selectedTicket || (!isWaitlistMode && (loadingQuote || !quote))}
-                                    className={`w-full py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
+                                    className={`w-full py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                                         isWaitlistMode
                                             ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/25"
                                             : "bg-gradient-to-r from-[#4353ff] to-indigo-600 hover:from-indigo-700 hover:to-indigo-800 shadow-indigo-500/25"
@@ -529,6 +531,10 @@ export default function EventDetail({ currentUser: propUser }) {
                                 >
                                     {submitting ? (
                                         "Đang xử lý..."
+                                    ) : !selectedTicket ? (
+                                        "Chưa mở bán vé"
+                                    ) : loadingQuote && !isWaitlistMode ? (
+                                        "Đang tải báo giá..."
                                     ) : isWaitlistMode ? (
                                         "Tham gia danh sách chờ (Join Waitlist)"
                                     ) : quote?.finalPrice === 0 ? (

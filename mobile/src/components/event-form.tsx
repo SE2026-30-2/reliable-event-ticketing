@@ -6,6 +6,7 @@ import { categories, salesSchedule } from "@/lib/events";
 import { eventStatuses } from "@/lib/management";
 import {
   Badge,
+  Body,
   Button,
   Card,
   Feedback,
@@ -19,11 +20,13 @@ export function EventForm({
   event,
   onSaved,
   onBusyChange,
+  onManageTicketTypes,
   embedded = false,
 }: {
   event?: Event;
   onSaved: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onManageTicketTypes?: () => void;
   embedded?: boolean;
 }) {
   const [name, setName] = useState(event?.name || "");
@@ -131,6 +134,20 @@ export function EventForm({
         <Heading>{event ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}</Heading>
       )}
       <Feedback message={error} />
+      {event && onManageTicketTypes && (
+        <Card style={{ backgroundColor: "#f5f3ff", borderColor: "#e0dcf4" }}>
+          <Heading>Vé & giá bán</Heading>
+          <Body muted>Thêm loại vé, thiết lập giá và số lượng.</Body>
+          <Button
+            secondary
+            icon="ticket"
+            title="Quản lý loại vé"
+            disabled={busy || reading}
+            onPress={onManageTicketTypes}
+          />
+          <Body muted>Lưu thay đổi sự kiện trước khi chuyển mục.</Body>
+        </Card>
+      )}
       {final && (
         <Heading>Sự kiện đã kết thúc hoặc bị hủy, không thể chỉnh sửa.</Heading>
       )}

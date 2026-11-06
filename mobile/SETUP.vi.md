@@ -32,11 +32,22 @@ Khi tải lại mã nguồn trên máy khác, chạy `npm.cmd ci` trong thư m�
 ### Kết nối API
 
 Backend Identity cần truy cập được ở cổng 8087 và Ticketing ở cổng 8091.
-Mặc định ứng dụng dùng hostname của máy chạy Expo. Nếu cần chỉ định địa chỉ,
-sao chép `.env.example` thành `.env.local`, rồi sửa IP LAN của máy backend.
+Tại thư mục gốc chạy `docker compose up -d` để áp dụng cấu hình mở hai cổng API cho LAN.
+Khi Docker và Expo chạy cùng máy, dùng `npm.cmd start -- --go --lan` trong `mobile`;
+ứng dụng tự dùng hostname của máy chạy Expo, không cần đặt IP cố định.
+Nếu `.env` hoặc `.env.local` có URL từ máy cũ, bỏ các giá trị đó để nhận diện tự động.
+Nếu backend chạy trên máy khác, sao chép `.env.example` thành `.env.local`,
+bỏ dấu `#` ở hai biến URL rồi sửa thành IP LAN của máy backend.
 Không dùng `localhost` khi chạy trên điện thoại thật. Android emulator có thể
 dùng `10.0.2.2`. Cho phép hai cổng API qua Windows Firewall trên mạng đang dùng.
 Khởi động lại Expo sau khi sửa cấu hình. Tunnel của Expo không chuyển tiếp API.
+
+Nếu vẫn quá thời gian chờ, mở trên trình duyệt điện thoại hai địa chỉ
+`http://<IP-máy-backend>:8087/actuator/health/liveness` và
+`http://<IP-máy-backend>:8091/actuator/health/liveness` (xem IP bằng `ipconfig`).
+Cả hai phải trả JSON có `status: UP`. Nếu không mở được, kiểm tra Windows Firewall
+và Wi-Fi có chặn kết nối giữa các thiết bị hay không. Cấu hình tự nhận IP chỉ dùng
+khi phát triển qua Expo LAN; bản cài độc lập cần URL backend HTTPS truy cập được.
 
 Dừng server bằng `Ctrl+C`. Nếu mạng chặn kết nối LAN, có thể thử
 `npx.cmd expo start --go --tunnel`; CLI có thể yêu cầu tải thêm công cụ tunnel.
