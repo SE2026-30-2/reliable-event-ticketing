@@ -13,6 +13,8 @@
     "test:screen17:browser": "playwright test --config playwright.screen17.config.mjs",
     "test:auth:browser": "playwright test --config playwright.auth.config.mjs",
     "test:auth-extended:browser": "playwright test tests/auth-extended.spec.mjs --config playwright.auth.config.mjs",
+    "test:payment:browser": "playwright test tests/payment-vnpay.spec.mjs --config playwright.regression.config.mjs",
+    "test:hardware:browser": "playwright test tests/hardware-checkin.spec.mjs --config playwright.regression.config.mjs",
     "test:screen13": "node --test tests/screen13.test.mjs",
     "test:screen13:browser": "playwright test --config playwright.screen13.config.mjs",
     "dev": "vite",
