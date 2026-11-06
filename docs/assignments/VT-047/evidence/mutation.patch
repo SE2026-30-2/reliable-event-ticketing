@@ -1,0 +1,15 @@
+diff --git a/backend/ticketing-platform/src/main/java/com/ticketing/reporting/application/EventReportService.java b/backend/ticketing-platform/src/main/java/com/ticketing/reporting/application/EventReportService.java
+index 9aa4f71..4440bf7 100644
+--- a/backend/ticketing-platform/src/main/java/com/ticketing/reporting/application/EventReportService.java
++++ b/backend/ticketing-platform/src/main/java/com/ticketing/reporting/application/EventReportService.java
+@@ -35,9 +35,7 @@ public class EventReportService {
+ 
+     /** One active check-in export per event in this JVM. Always release after failure or success. */
+     public void writeCheckinsCsv(UUID eventId, Writer out) {
+-        if (!activeCheckinExports.add(eventId)) {
+-            throw new ExportBusyException();
+-        }
++        // VT-047 deliberate mutation: concurrency guard removed.
+         try {
+             CsvWriter csv = new CsvWriter(out);
+             csv.row(List.of("id", "ticket_id", "device_id", "outcome", "server_received_at"));

@@ -40,6 +40,7 @@ class CheckinExportApiTest {
     static final String URL = "/api/manage/events/{id}/checkins.csv";
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired EventReportService reports;
     @MockBean EventRepositoryPort events;
 
     @TestConfiguration static class Db {
@@ -85,5 +86,27 @@ class CheckinExportApiTest {
         mvc.perform(get(URL,A).with(as("owner@test.invalid","ORGANIZER"))).andExpect(status().isServiceUnavailable())
                 .andExpect(header().doesNotExist("Content-Disposition"))
                 .andExpect(content().string(not(containsString("SELECT"))));
+    }
+    @Test void T17_busyExportMapsTo409WithoutAttachment() throws Exception {
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var task = pool.submit(() -> reports.writeCheckinsCsv(A, new java.io.Writer() {
+            public void write(char[] c, int o, int n) throws java.io.IOException {
+                entered.countDown();
+                try {
+                    if (!release.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new java.io.IOException("gate timeout");
+                } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new java.io.IOException(e); }
+            }
+            public void flush() {} public void close() {}
+        }));
+        try {
+            org.assertj.core.api.Assertions.assertThat(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            mvc.perform(get(URL,A).with(as("owner@test.invalid","ORGANIZER")))
+                    .andExpect(status().isConflict()).andExpect(header().doesNotExist("Content-Disposition"));
+        } finally {
+            release.countDown();
+            try { task.get(5, java.util.concurrent.TimeUnit.SECONDS); } finally { pool.shutdownNow(); }
+        }
     }
 }

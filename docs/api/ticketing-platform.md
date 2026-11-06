@@ -1,5 +1,19 @@
 # Reliable Event Ticketing - Ticketing Platform API Reference
 
+## Check-in CSV export (VT-047)
+
+`GET /api/manage/events/{eventId}/checkins.csv`: ADMIN or the event's ORGANIZER.
+Returns `text/csv;charset=UTF-8`, BOM, attachment `checkins-{eventId}.csv` and
+`Cache-Control: no-store`. Columns: `id,ticket_id,device_id,outcome,server_received_at`.
+Includes all outcomes for this event only, ordered by timestamp then id; nullable
+ticket/device IDs are empty. An empty event returns the header only.
+401 anonymous; 403 wrong role; 404 missing/foreign event; 400 invalid UUID;
+409 while the same event export is active in this JVM; 503 on SQL failure.
+The small synchronous export buffers CSV before sending HTTP 200. Guard applies
+to generation in one JVM, not distributed instances or network transfer. Large
+event memory limits and real PostgreSQL/HTTP performance remain unverified.
+See `docs/assignments/VT-047/README.md` for executable tests and evidence.
+
 Base URL `http://localhost:8091`. Swagger UI: `/swagger-ui.html`, OpenAPI: `/api-docs`. Định dạng JSON, thời gian ISO-8601 UTC.
 
 **Xác thực**: 🔓 công khai · 👤 `Authorization: Bearer <JWT>` của **bất kỳ tài khoản** `identity-service` (người mua) · 🔑 JWT có `ROLE_ADMIN` **hoặc** `ROLE_ORGANIZER` (ký hiệu 🔑 trong tài liệu này; ORGANIZER chỉ với **sự kiện của mình**, sự kiện khác trả `404`) · 🛡 chỉ `ROLE_ADMIN` (dùng ở hoàn tiền) · 📟 header `X-Device-Key`. Với 👤, JWT chỉ cho biết *ai* gọi; việc *có sở hữu* đặt chỗ/vé đó hay không do server kiểm tra, và "không phải của bạn" luôn trả `404` (không phải `403`) để không dò được id.

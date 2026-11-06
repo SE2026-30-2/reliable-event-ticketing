@@ -1,0 +1,64 @@
+{
+  "com/ticketing/reporting/web/ReportController": {
+    "checkins": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 63
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 12
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      }
+    }
+  },
+  "com/ticketing/reporting/application/EventReportService": {
+    "writeCheckinsCsv": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 48
+      },
+      "BRANCH": {
+        "missed": 0,
+        "covered": 2
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 10
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 2
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "lambda$writeCheckinsCsv$0": {
+      "INSTRUCTION": {
+        "missed": 6,
+        "covered": 43
+      },
+      "LINE": {
+        "missed": 2,
+        "covered": 5
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      }
+    }
+  }
+}

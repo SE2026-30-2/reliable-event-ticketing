@@ -1,0 +1,88 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.ticketing:ticketing-platform >------------------
+[INFO] Building ticketing-platform 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ ticketing-platform ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 12 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ ticketing-platform ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ ticketing-platform ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ ticketing-platform ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ ticketing-platform ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+mvnw.cmd : Nov 06, 2026 10:01:07 PM org.junit.platform.launcher.core.LauncherConfigurationParameters 
+loadClasspathResource
+At line:1 char:53
++ ... n Continue; & .\mvnw.cmd -B -ntp '-Dtest=CheckinExport*Test,CsvWriter ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Nov 06, 2026 10...asspathResource:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: Discovered 2 'junit-platform.properties' configuration files in the classpath; only the first will be used.
+Nov 06, 2026 10:01:07 PM org.junit.platform.launcher.core.LauncherConfigurationParameters loadClasspathResource
+WARNING: Discovered 2 'junit-platform.properties' configuration files in the classpath; only the first will be used.
+Nov 06, 2026 10:01:07 PM org.junit.platform.launcher.core.LauncherConfigurationParameters loadClasspathResource
+WARNING: Discovered 2 'junit-platform.properties' configuration files in the classpath; only the first will be used.
+Nov 06, 2026 10:01:07 PM org.junit.platform.launcher.core.LauncherConfigurationParameters loadClasspathResource
+WARNING: Discovered 2 'junit-platform.properties' configuration files in the classpath; only the first will be used.
+Nov 06, 2026 10:01:07 PM org.junit.platform.launcher.core.LauncherConfigurationParameters loadClasspathResource
+WARNING: Discovered 2 'junit-platform.properties' configuration files in the classpath; only the first will be used.
+[INFO] Running com.ticketing.reporting.application.CheckinExportContractTest
+VT047_LOAD p95_ms=193.1177 samples=360 errors=0
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.292 s -- in com.ticketing.reporting.application.CheckinExportContractTest
+[INFO] Running com.ticketing.reporting.application.CsvWriterTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.ticketing.reporting.application.CsvWriterTest
+[INFO] Running com.ticketing.reporting.web.CheckinExportApiTest
+22:01:09.375 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.ticketing.TicketingPlatformApplication for test class com.ticketing.reporting.web.CheckinExportApiTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.3.10)
+
+2026-11-06T22:01:09.891+07:00  INFO 30352 --- [ticketing-platform] [           main] c.t.reporting.web.CheckinExportApiTest   : Starting CheckinExportApiTest using Java 21.0.1 with PID 30352 (started by saoma in D:\SEPROJECT\bt3-vt047\backend\ticketing-platform)
+2026-11-06T22:01:09.893+07:00  INFO 30352 --- [ticketing-platform] [           main] c.t.reporting.web.CheckinExportApiTest   : No active profile set, falling back to 1 default profile: "default"
+WARNING: A Java agent has been loaded dynamically 
+(C:\Users\saoma\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.19\byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap 
+classpath has been appended
+2026-11-06T22:01:14.686+07:00  INFO 30352 --- [ticketing-platform] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-06T22:01:14.686+07:00  INFO 30352 --- [ticketing-platform] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-06T22:01:14.689+07:00  INFO 30352 --- [ticketing-platform] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-11-06T22:01:14.723+07:00  INFO 30352 --- [ticketing-platform] [           main] c.t.reporting.web.CheckinExportApiTest   : Started CheckinExportApiTest in 5.226 seconds (process running for 7.924)
+2026-11-06T22:01:15.104+07:00  WARN 30352 --- [ticketing-platform] [           main] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Method parameter 'eventId': Failed to convert value of type 'java.lang.String' to required type 'java.util.UUID'; Invalid UUID string: invalid]
+2026-11-06T22:01:15.126+07:00  WARN 30352 --- [ticketing-platform] [           main] c.t.s.web.error.GlobalExceptionHandler   : Not found: Event not found: 00000000-0000-0000-0000-000000000063
+2026-11-06T22:01:15.141+07:00  WARN 30352 --- [ticketing-platform] [           main] c.t.s.web.error.GlobalExceptionHandler   : Not found: Event not found: 00000000-0000-0000-0000-000000000002
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.182 s -- in com.ticketing.reporting.web.CheckinExportApiTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  13.082 s
+[INFO] Finished at: 2026-11-06T22:01:15+07:00
+[INFO] ------------------------------------------------------------------------
