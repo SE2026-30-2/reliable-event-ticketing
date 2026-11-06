@@ -14,7 +14,9 @@ npm.cmd start
 
 Mở bằng Expo Go tương thích SDK 58 hoặc development build. Có thể xem trước giao diện bằng `npm.cmd run web`. Hướng dẫn Windows và kết nối điện thoại: [SETUP.vi.md](./SETUP.vi.md).
 
-Backend cần chạy Identity ở cổng 8087 và Ticketing ở cổng 8091. Khi chạy development, ứng dụng tự dùng hostname của Expo server để gọi backend. Nếu dùng emulator, tunnel, hoặc backend ở máy khác, sao chép `.env.example` thành `.env.local` và sửa hai địa chỉ API:
+Backend cần chạy Identity ở cổng 8087 và Ticketing ở cổng 8091. Docker Compose mở hai cổng API cho mạng LAN. Khi Expo và Docker chạy trên cùng máy, ứng dụng tự dùng hostname của Expo server để gọi backend; không cần đặt IP cố định. Kết nối điện thoại và máy tính cùng Wi-Fi, chạy `docker compose up -d` ở thư mục gốc và `npm.cmd start -- --go --lan` trong `mobile`.
+
+Nếu đã cấu hình URL trong `.env` hoặc `.env.local`, bỏ các giá trị IP cũ để dùng nhận diện tự động. Nếu dùng tunnel hoặc backend ở máy khác, sao chép `.env.example` thành `.env.local`, bỏ dấu `#` và thay hai địa chỉ ví dụ bằng IP máy backend (hoặc URL HTTPS khi đóng gói ứng dụng):
 
 ```dotenv
 EXPO_PUBLIC_IDENTITY_SERVICE_URL=http://192.168.1.10:8087
@@ -24,6 +26,10 @@ EXPO_PUBLIC_TICKETING_SERVICE_URL=http://192.168.1.10:8091
 Điện thoại cần truy cập được cả hai cổng qua LAN. `localhost` trên điện thoại trỏ tới chính điện thoại. Android emulator thường dùng `10.0.2.2`; iOS simulator dùng `localhost`. Expo tunnel chỉ chuyển tiếp Metro, không chuyển tiếp backend. Khởi động lại Expo sau khi thay đổi biến môi trường. Khi đóng gói để sử dụng thực tế, cấu hình URL backend HTTPS.
 
 ## Phạm vi đã chuyển
+
+Trong danh sách quản lý sự kiện, nút **Quản lý loại vé** mở thẳng mục **Loại vé**
+của sự kiện đó. Trong mục **Thông tin**, form chỉnh sửa cũng có khối **Vé & giá bán**
+với cùng nút truy cập; lưu thay đổi sự kiện trước khi chuyển mục.
 
 | Nhóm | Chức năng |
 | --- | --- |

@@ -77,8 +77,13 @@ interface Report {
   };
 }
 function ManagementContent() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [tab, setTab] = useState<Tab>("overview");
+  const { id, tab: requestedTab } = useLocalSearchParams<{
+    id: string;
+    tab?: string;
+  }>();
+  const tab: Tab = Object.keys(tabs).includes(requestedTab || "")
+    ? (requestedTab as Tab)
+    : "overview";
   const load = useCallback(
     async (signal: AbortSignal) => {
       const [event] = await Promise.all([
@@ -112,7 +117,7 @@ function ManagementContent() {
             key={key}
             title={label}
             secondary={key !== tab}
-            onPress={() => setTab(key as Tab)}
+            onPress={() => router.setParams({ tab: key })}
           />
         ))}
       </View>
@@ -127,6 +132,7 @@ function ManagementContent() {
                 key={resource.data.startsAt + resource.data.status}
                 event={resource.data}
                 onSaved={resource.reload}
+                onManageTicketTypes={() => router.setParams({ tab: "types" })}
               />
             ) : tab === "checkin" ? (
               <CheckinReport id={id} />
