@@ -15,17 +15,112 @@ const axiosClient = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
+const isAuthEndpoint = (url = '') =>
+    url.includes('/api/user/login') ||
+    url.includes('/api/user/register') ||
+    url.includes('/api/user/refresh') ||
+    url.includes('/api/user/password/forgot') ||
+    url.includes('/api/user/password/reset') ||
+    (url.includes('/api/user/email/verify') && !url.includes('/api/user/email/verify/resend'));
+
+const isAuthRequest = (config = {}) =>
+    Boolean(config.skipAuth || config._isRefresh || isAuthEndpoint(config.url));
+
+const clearAuthAndNotify = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    window.dispatchEvent(new Event('auth:unauthorized'));
+};
+
+const formatError = (error) => {
+    if (error instanceof Error && error.response !== undefined) {
+        return error;
+    }
+    const message =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.response?.data?.error ||
+        (Array.isArray(error.response?.data?.details) && error.response.data.details.join('; ')) ||
+        error.message ||
+        'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+
+    const failure = new Error(message, { cause: error });
+    Object.assign(failure, {
+        response: error.response,
+        config: error.config,
+        code: error.code,
+        isAxiosError: error.isAxiosError,
+    });
+    return failure;
+};
+
+let refreshPromise = null;
+
+const refreshTokens = async () => {
+    if (refreshPromise) {
+        return refreshPromise;
+    }
+
+    const currentRefreshToken = localStorage.getItem('refresh_token');
+    if (!currentRefreshToken) {
+        clearAuthAndNotify();
+        throw new Error('Không tìm thấy refresh token.');
+    }
+
+    refreshPromise = (async () => {
+        try {
+            const data = await userClient.post(
+                '/api/user/refresh',
+                { refreshToken: currentRefreshToken },
+                { skipAuth: true, _isRefresh: true }
+            );
+
+            if (!data?.accessToken) {
+                throw new Error('Máy chủ chưa trả về access token mới.');
+            }
+
+            localStorage.setItem('access_token', data.accessToken);
+            if (data.refreshToken) {
+                localStorage.setItem('refresh_token', data.refreshToken);
+            }
+
+            return data.accessToken;
+        } catch (err) {
+            clearAuthAndNotify();
+            throw err;
+        } finally {
+            refreshPromise = null;
+        }
+    })();
+
+    return refreshPromise;
+};
+
 // Hàm gán Interceptor chung
 const setupInterceptors = (instance) => {
     instance.interceptors.request.use(
         (config) => {
-            // Các API Auth công khai không cần gửi Token
-            const isAuthRequest = config.skipAuth || config.url?.includes('/api/user/login') || config.url?.includes('/api/user/register') || config.url?.includes('/api/user/password/forgot') || config.url?.includes('/api/user/password/reset') || (config.url?.includes('/api/user/email/verify') && !config.url?.includes('/api/user/email/verify/resend'));
-
+            const isAuth = isAuthRequest(config);
             const token = config.accessToken ?? localStorage.getItem('access_token');
-            if (isAuthRequest) config.headers.delete('Authorization');
-            if (token && !isAuthRequest) {
-                config.headers.Authorization = `Bearer ${token}`;
+
+            if (isAuth && config.headers) {
+                if (typeof config.headers.delete === 'function') {
+                    config.headers.delete('Authorization');
+                } else {
+                    delete config.headers.Authorization;
+                    delete config.headers.authorization;
+                }
+            }
+
+            if (token && !isAuth) {
+                if (config.headers) {
+                    if (typeof config.headers.set === 'function') {
+                        config.headers.set('Authorization', `Bearer ${token}`);
+                    } else {
+                        config.headers.Authorization = `Bearer ${token}`;
+                    }
+                }
             }
             return config;
         },
@@ -34,28 +129,39 @@ const setupInterceptors = (instance) => {
 
     instance.interceptors.response.use(
         (response) => response.data,
-        (error) => {
-            const isAuthRequest = error.config?.skipAuth || error.config?.url?.includes('/api/user/login') || error.config?.url?.includes('/api/user/register') || error.config?.url?.includes('/api/user/password/forgot') || error.config?.url?.includes('/api/user/password/reset') || (error.config?.url?.includes('/api/user/email/verify') && !error.config?.url?.includes('/api/user/email/verify/resend'));
+        async (error) => {
+            const isAuth = isAuthRequest(error?.config);
 
-            // Bỏ qua xóa token/bắn event nếu lỗi 401 đến từ trang Login hoặc Register
-            if (error.response?.status === 401 && !isAuthRequest) {
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
-                localStorage.removeItem('user');
-                window.dispatchEvent(new Event('auth:unauthorized'));
+            // Xử lý khi access token hết hạn (401) đối với các request cần xác thực
+            if (error?.response?.status === 401 && !isAuth) {
+                const originalConfig = error.config;
+                if (originalConfig && !originalConfig._retry) {
+                    originalConfig._retry = true;
+                    const refreshToken = localStorage.getItem('refresh_token');
+                    if (refreshToken) {
+                        try {
+                            const newAccessToken = await refreshTokens();
+                            if (originalConfig.headers) {
+                                if (typeof originalConfig.headers.set === 'function') {
+                                    originalConfig.headers.set('Authorization', `Bearer ${newAccessToken}`);
+                                } else {
+                                    originalConfig.headers.Authorization = `Bearer ${newAccessToken}`;
+                                }
+                            }
+                            if (originalConfig.accessToken) {
+                                originalConfig.accessToken = newAccessToken;
+                            }
+                            return instance(originalConfig);
+                        } catch (refreshError) {
+                            return Promise.reject(formatError(refreshError));
+                        }
+                    }
+                }
+
+                clearAuthAndNotify();
             }
 
-            const message =
-                error.response?.data?.message ||
-                error.response?.data?.detail ||
-                error.response?.data?.error ||
-                (Array.isArray(error.response?.data?.details) && error.response.data.details.join('; ')) ||
-                error.message ||
-                'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
-
-            const failure = new Error(message, { cause: error });
-            Object.assign(failure, { response: error.response, config: error.config, code: error.code, isAxiosError: error.isAxiosError });
-            return Promise.reject(failure);
+            return Promise.reject(formatError(error));
         }
     );
 };

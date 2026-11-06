@@ -12,6 +12,14 @@ export const userService = {
         });
     },
 
+    refreshToken: async (token) => {
+        const refreshToken = token || localStorage.getItem('refresh_token');
+        if (!refreshToken) {
+            throw new Error('Không tìm thấy refresh token.');
+        }
+        return userClient.post('/api/user/refresh', { refreshToken }, { skipAuth: true, _isRefresh: true });
+    },
+
     resendVerificationEmail: async () => {
         return userClient.post('/api/user/email/verify/resend', {});
     },
