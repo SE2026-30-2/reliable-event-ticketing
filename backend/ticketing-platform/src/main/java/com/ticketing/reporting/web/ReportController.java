@@ -30,6 +30,24 @@ public class ReportController {
     private final EventReportService reportService;
     private final ManagementAccess access;
 
+    /** Small synchronous export: SQL must succeed before committing HTTP 200. */
+    @GetMapping("/api/manage/events/{eventId}/checkins.csv")
+    public ResponseEntity<byte[]> checkins(@PathVariable UUID eventId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        access.assertCanManage(eventId, jwt, authentication);
+        java.io.StringWriter out = new java.io.StringWriter();
+        try {
+            reportService.writeCheckinsCsv(eventId, out);
+        } catch (EventReportService.ExportBusyException e) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Export already in progress");
+        } catch (org.springframework.dao.DataAccessException e) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Export unavailable");
+        }
+        return ResponseEntity.ok().contentType(CSV)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("checkins-" + eventId + ".csv").build().toString())
+                .body(out.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
     @GetMapping("/api/manage/events/{eventId}/report")
     public EventReport report(@PathVariable UUID eventId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         access.assertCanManage(eventId, jwt, authentication);

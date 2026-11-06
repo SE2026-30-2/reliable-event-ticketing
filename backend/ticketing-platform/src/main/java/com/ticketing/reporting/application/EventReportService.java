@@ -28,6 +28,38 @@ import java.util.UUID;
 public class EventReportService {
 
     private final JdbcTemplate jdbc;
+    private final java.util.Set<UUID> activeCheckinExports = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    public static final class ExportBusyException extends RuntimeException {
+    }
+
+    /** One active check-in export per event in this JVM. Always release after failure or success. */
+    public void writeCheckinsCsv(UUID eventId, Writer out) {
+        if (!activeCheckinExports.add(eventId)) {
+            throw new ExportBusyException();
+        }
+        try {
+            CsvWriter csv = new CsvWriter(out);
+            csv.row(List.of("id", "ticket_id", "device_id", "outcome", "server_received_at"));
+            jdbc.query("""
+                    SELECT id, ticket_id, device_id, outcome, server_received_at
+                    FROM checkin_records WHERE event_id = ? ORDER BY server_received_at, id
+                    """, rs -> {
+                try {
+                    csv.row(java.util.Arrays.asList(rs.getLong("id"), rs.getObject("ticket_id", UUID.class),
+                            rs.getObject("device_id", UUID.class), rs.getString("outcome"),
+                            instant(rs.getTimestamp("server_received_at"))));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }, eventId);
+            out.flush();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            activeCheckinExports.remove(eventId);
+        }
+    }
 
     public record TicketTypeLine(UUID ticketTypeId, String name, long priceCents, int quota, int issued, int reserved,
                                  int remaining, long refunded, long voided, long guests, long checkedIn, long revenueCents) {
