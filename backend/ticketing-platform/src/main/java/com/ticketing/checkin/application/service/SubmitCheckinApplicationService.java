@@ -16,6 +16,7 @@ import com.ticketing.checkin.infrastructure.security.VerifiedTicketClaims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -51,6 +52,18 @@ public class SubmitCheckinApplicationService implements SubmitCheckinUseCase {
 
     @Override
     public CheckinRecord submitCheckin(SubmitCheckinCommand command) {
+        try {
+            return submitOnce(command);
+        } catch (DataIntegrityViolationException conflict) {
+            // Repository transaction has ended before this read. Another submission may have
+            // committed the same key after our initial lookup; return its durable outcome.
+            // Do not turn an unrelated constraint violation into a fabricated success.
+            return checkinRecordRepositoryPort.findByIdempotencyKey(command.idempotencyKey())
+                    .orElseThrow(() -> conflict);
+        }
+    }
+
+    private CheckinRecord submitOnce(SubmitCheckinCommand command) {
         Optional<CheckinRecord> replay = checkinRecordRepositoryPort.findByIdempotencyKey(command.idempotencyKey());
         if (replay.isPresent()) {
             return replay.get();
