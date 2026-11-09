@@ -3,6 +3,7 @@ package com.ticketing.payment.infrastructure.vnpay;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.ticketing.payment.application.port.OnlinePaymentPort.TransactionState;
+import com.ticketing.payment.application.port.ProviderQueryException;
 import com.ticketing.payment.domain.model.PaymentRequest;
 import com.ticketing.payment.domain.model.PaymentStatus;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,9 +37,13 @@ class VnpayGatewayTest {
     private static final List<String> REFUND_RESPONSE = QUERY_RESPONSE.subList(0, 13); // no promotion fields
 
     private HttpServer server;
+    private final AtomicInteger requests = new AtomicInteger();
     private final AtomicReference<Map<String, Object>> lastRequest = new AtomicReference<>();
     private volatile Map<String, String> nextResponse;
     private volatile boolean signResponse = true;
+    private volatile boolean malformedResponse;
+    private volatile int nextHttpStatus = 200;
+    private volatile long firstResponseDelayMillis;
     private VnpayGateway gateway;
     private final VnpaySigner signer = new VnpaySigner(SECRET);
 
@@ -45,9 +51,31 @@ class VnpayGatewayTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api", ex -> {
+            int attempt = requests.incrementAndGet();
             Map<String, Object> req = MAPPER.readValue(ex.getRequestBody(), new com.fasterxml.jackson.core.type.TypeReference<>() {
             });
             lastRequest.set(req);
+            if (attempt == 1 && firstResponseDelayMillis > 0) {
+                try {
+                    Thread.sleep(firstResponseDelayMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    ex.close();
+                    return;
+                }
+            }
+            if (nextHttpStatus / 100 != 2) {
+                ex.sendResponseHeaders(nextHttpStatus, -1);
+                ex.close();
+                return;
+            }
+            if (malformedResponse) {
+                byte[] body = "not-json".getBytes(StandardCharsets.UTF_8);
+                ex.sendResponseHeaders(200, body.length);
+                ex.getResponseBody().write(body);
+                ex.close();
+                return;
+            }
             List<String> fields = "refund".equals(req.get("vnp_Command")) ? REFUND_RESPONSE : QUERY_RESPONSE;
             Map<String, String> res = new LinkedHashMap<>(nextResponse);
             res.put("vnp_SecureHash", signResponse ? signer.signPipe(res, fields) : "deadbeef");
@@ -151,7 +179,47 @@ class VnpayGatewayTest {
     void anUnsignedOrForgedApiResponseIsNeverTrusted() {
         signResponse = false;
         nextResponse = Map.of("vnp_ResponseCode", "00", "vnp_Message", "ok", "vnp_TransactionStatus", "00", "vnp_Amount", "5000000");
-        assertThatThrownBy(() -> gateway.query(payment())).isInstanceOf(IllegalStateException.class).hasMessageContaining("signature");
+        assertThatThrownBy(() -> gateway.query(payment())).isInstanceOf(ProviderQueryException.class).hasMessageContaining("signature");
+        assertThat(requests).hasValue(1);
+    }
+
+    @Test
+    void queryDoesNotRetryHttpClientErrorsOrProviderBusinessErrors() {
+        nextHttpStatus = 429;
+        assertThatThrownBy(() -> gateway.query(payment())).isInstanceOf(ProviderQueryException.class);
+        assertThat(requests).hasValue(1);
+
+        requests.set(0);
+        nextHttpStatus = 200;
+        nextResponse = Map.of("vnp_ResponseCode", "99", "vnp_Message", "business error");
+        assertThatThrownBy(() -> gateway.query(payment())).isInstanceOf(ProviderQueryException.class);
+        assertThat(requests).hasValue(1);
+    }
+
+    @Test
+    void queryDoesNotRetryMalformedResponses() {
+        malformedResponse = true;
+
+        assertThatThrownBy(() -> gateway.query(payment())).isInstanceOf(ProviderQueryException.class);
+        assertThat(requests).hasValue(1);
+    }
+
+    @Test
+    void queryRetriesRequestTimeoutWithinTheRetryBudget() {
+        firstResponseDelayMillis = 600;
+        nextResponse = Map.of("vnp_ResponseId", "x", "vnp_Command", "querydr", "vnp_ResponseCode", "00", "vnp_Message", "OK",
+                "vnp_TmnCode", "TMN", "vnp_TxnRef", "ref1", "vnp_Amount", "5000000", "vnp_PayDate", "20260101101010",
+                "vnp_TransactionNo", "999", "vnp_TransactionStatus", "00");
+
+        assertThat(gateway.query(payment()).state()).isEqualTo(TransactionState.SUCCESS);
+        assertThat(requests).hasValue(2);
+    }
+
+    @Test
+    void refundDoesNotRetryHttpServerErrors() {
+        nextHttpStatus = 503;
+        assertThatThrownBy(() -> gateway.refund(payment(), "admin@x.com")).isInstanceOf(IllegalStateException.class);
+        assertThat(requests).hasValue(1);
     }
 
     @Test

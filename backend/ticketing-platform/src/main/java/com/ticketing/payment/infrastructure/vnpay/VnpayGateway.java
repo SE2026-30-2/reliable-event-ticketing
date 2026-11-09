@@ -1,8 +1,10 @@
 package com.ticketing.payment.infrastructure.vnpay;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketing.payment.application.port.OnlinePaymentPort;
+import com.ticketing.payment.application.port.ProviderQueryException;
 import com.ticketing.payment.domain.model.PaymentRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,10 +12,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.EOFException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
 import java.net.URI;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -24,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /** VNPay (sandbox or production, by {@code ticketing.payment.vnpay.*}) behind {@link OnlinePaymentPort}. */
 @Component
@@ -34,6 +44,11 @@ public class VnpayGateway implements OnlinePaymentPort {
     static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh"); // UTC+7, no DST
     static final DateTimeFormatter VN_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(VN_ZONE);
     private static final String VERSION = "2.1.0";
+    private static final int QUERY_MAX_ATTEMPTS = 3;
+    // Leave headroom for local persistence and outbox work inside the full sync request budget.
+    private static final Duration QUERY_RETRY_BUDGET = Duration.ofMillis(1200);
+    private static final Duration QUERY_ATTEMPT_TIMEOUT = Duration.ofMillis(350);
+    private static final Duration QUERY_RETRY_DELAY = Duration.ofMillis(50);
 
     private static final List<String> QUERY_REQUEST_FIELDS = List.of("vnp_RequestId", "vnp_Version", "vnp_Command",
             "vnp_TmnCode", "vnp_TxnRef", "vnp_TransactionDate", "vnp_CreateDate", "vnp_IpAddr", "vnp_OrderInfo");
@@ -136,15 +151,20 @@ public class VnpayGateway implements OnlinePaymentPort {
         req.put("vnp_IpAddr", serverIp);
         req.put("vnp_SecureHash", signer.signPipe(req, QUERY_REQUEST_FIELDS));
 
-        Map<String, String> res = post(req, QUERY_RESPONSE_FIELDS);
+        Map<String, String> res = postQuery(req, QUERY_RESPONSE_FIELDS);
         String code = res.get("vnp_ResponseCode");
         if ("91".equals(code)) {
             return new ProviderTransaction(TransactionState.NOT_FOUND, 0, null, null, res.get("vnp_Message"));
         }
         if (!"00".equals(code)) {
-            throw new IllegalStateException("VNPay querydr failed: " + code + " " + res.get("vnp_Message"));
+            throw new ProviderQueryException("VNPay querydr failed: " + code + " " + res.get("vnp_Message"));
         }
-        long amount = res.get("vnp_Amount") == null ? 0 : Long.parseLong(res.get("vnp_Amount"));
+        long amount;
+        try {
+            amount = res.get("vnp_Amount") == null ? 0 : Long.parseLong(res.get("vnp_Amount"));
+        } catch (NumberFormatException e) {
+            throw new ProviderQueryException("VNPay querydr returned an invalid amount", e);
+        }
         TransactionState state = switch (String.valueOf(res.get("vnp_TransactionStatus"))) {
             case "00" -> TransactionState.SUCCESS;
             case "01" -> TransactionState.PENDING;
@@ -204,6 +224,112 @@ public class VnpayGateway implements OnlinePaymentPort {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("VNPay API call interrupted", e);
+        }
+    }
+
+    /** Retries only querydr transport failures and server errors; refund requests never use this path. */
+    private Map<String, String> postQuery(Map<String, String> body, List<String> responseFields) {
+        long deadline = System.nanoTime() + QUERY_RETRY_BUDGET.toNanos();
+        final String json;
+        try {
+            json = objectMapper.writeValueAsString(body);
+        } catch (JsonProcessingException e) {
+            throw new ProviderQueryException("Unable to encode VNPay querydr request", e);
+        }
+
+        ProviderQueryException lastFailure = null;
+        for (int attempt = 1; attempt <= QUERY_MAX_ATTEMPTS; attempt++) {
+            long remainingNanos = deadline - System.nanoTime();
+            if (remainingNanos <= 0) {
+                break;
+            }
+
+            HttpResponse<String> response;
+            try {
+                HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl))
+                        .timeout(Duration.ofNanos(Math.min(remainingNanos, QUERY_ATTEMPT_TIMEOUT.toNanos())))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(json))
+                        .build();
+                response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ProviderQueryException("VNPay querydr call interrupted", e);
+            } catch (IOException e) {
+                lastFailure = new ProviderQueryException("VNPay querydr transport failed: " + e.getMessage(), e);
+                if (!isTransientTransportFailure(e) || attempt == QUERY_MAX_ATTEMPTS
+                        || !waitBeforeQueryRetry(deadline)) {
+                    throw lastFailure;
+                }
+                continue;
+            } catch (IllegalArgumentException e) {
+                // Invalid provider URL or request configuration cannot be repaired by another attempt.
+                throw new ProviderQueryException("Invalid VNPay querydr request configuration", e);
+            }
+
+            int status = response.statusCode();
+            if (status >= 500 && status <= 599) {
+                lastFailure = new ProviderQueryException("VNPay querydr API HTTP " + status);
+                if (attempt == QUERY_MAX_ATTEMPTS || !waitBeforeQueryRetry(deadline)) {
+                    throw lastFailure;
+                }
+                continue;
+            }
+            if (status / 100 != 2) {
+                throw new ProviderQueryException("VNPay querydr API HTTP " + status);
+            }
+
+            Map<String, String> result = decodeResponse(response.body());
+            if (!signer.verifyPipe(result, responseFields, result.get("vnp_SecureHash"))) {
+                // An unauthenticated answer is never acted on and is not a transient failure.
+                throw new ProviderQueryException("VNPay API response failed signature verification");
+            }
+            return result;
+        }
+
+        if (lastFailure != null) {
+            throw lastFailure;
+        }
+        throw new ProviderQueryException("VNPay querydr retry budget elapsed before an attempt could start");
+    }
+
+    private Map<String, String> decodeResponse(String responseBody) {
+        try {
+            Map<String, Object> raw = objectMapper.readValue(responseBody, new TypeReference<>() {
+            });
+            Map<String, String> result = new LinkedHashMap<>();
+            raw.forEach((key, value) -> result.put(key, value == null ? null : String.valueOf(value)));
+            return result;
+        } catch (IOException | RuntimeException e) {
+            // Parsing and shape errors indicate a malformed response, so they are deliberately not retried.
+            throw new ProviderQueryException("VNPay querydr returned a malformed response", e);
+        }
+    }
+
+    private static boolean isTransientTransportFailure(IOException failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof HttpTimeoutException || cause instanceof SocketTimeoutException
+                    || cause instanceof ConnectException || cause instanceof NoRouteToHostException
+                    || cause instanceof UnknownHostException || cause instanceof SocketException
+                    || cause instanceof EOFException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean waitBeforeQueryRetry(long deadline) {
+        long remainingNanos = deadline - System.nanoTime();
+        if (remainingNanos <= 0) {
+            return false;
+        }
+        long delayNanos = Math.min(QUERY_RETRY_DELAY.toNanos(), remainingNanos);
+        try {
+            TimeUnit.NANOSECONDS.sleep(delayNanos);
+            return System.nanoTime() < deadline;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ProviderQueryException("VNPay querydr retry interrupted", e);
         }
     }
 }

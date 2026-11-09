@@ -93,11 +93,15 @@ public class OnlinePaymentApplicationService implements OnlinePaymentUseCase {
         PaymentRequest p = repository.findByTxnRef(txnRef).orElseThrow(() -> new PaymentNotFoundException(txnRef));
         reservations.assertOwnedBy(p.getReservationId(), requesterEmail);
         if (p.getStatus() == PaymentStatus.PENDING) {
+            ProviderTransaction tx = null;
             try {
-                resolveByQuery(p, false);
+                tx = provider.query(p);
             } catch (RuntimeException e) {
                 // Provider unreachable: report the still-pending state; the buyer polls, IPN/job settle it.
                 log.warn("Sync of {} could not reach the provider: {}", txnRef, e.getMessage());
+            }
+            if (tx != null) {
+                resolveByQuery(p, false, tx);
             }
         }
         return repository.findByTxnRef(txnRef).orElse(p);
@@ -144,11 +148,14 @@ public class OnlinePaymentApplicationService implements OnlinePaymentUseCase {
             if (!old && !pastDeadline) {
                 continue;
             }
+            ProviderTransaction tx;
             try {
-                resolveByQuery(p, pastDeadline);
+                tx = provider.query(p);
             } catch (RuntimeException e) {
                 log.warn("Reconcile of {} failed, will retry: {}", p.getTxnRef(), e.getMessage());
+                continue;
             }
+            resolveByQuery(p, pastDeadline, tx);
         }
         // Money taken for a reservation we could not honour: give it back.
         for (PaymentRequest p : repository.findByStatusAndProvider(PaymentStatus.REFUND_REQUIRED, "VNPAY")) {
@@ -172,8 +179,7 @@ public class OnlinePaymentApplicationService implements OnlinePaymentUseCase {
 
     /** Asks the provider. With {@code pastDeadline}, "no record" / "still pending" means the buyer
      * never finished - fail it so the reservation is freed instead of being held forever. */
-    private void resolveByQuery(PaymentRequest p, boolean pastDeadline) {
-        ProviderTransaction tx = provider.query(p);
+    private void resolveByQuery(PaymentRequest p, boolean pastDeadline, ProviderTransaction tx) {
         if (tx.state() == TransactionState.SUCCESS) {
             if (tx.amountCents() != p.getAmountCents()) {
                 log.error("Query amount mismatch for {}: expected {} got {}", p.getTxnRef(), p.getAmountCents(), tx.amountCents());
@@ -192,29 +198,72 @@ public class OnlinePaymentApplicationService implements OnlinePaymentUseCase {
             return;
         }
         Instant now = Instant.now();
-        p.setCompletedAt(now);
-        p.setProviderTxnNo(providerTxnNo);
-        p.setProviderPaidAt(payDate);
+        PaymentRequest transition = copyOf(p);
+        transition.setCompletedAt(now);
+        transition.setProviderTxnNo(providerTxnNo);
+        transition.setProviderPaidAt(payDate);
+        boolean publishCompleted = false;
+        boolean publishFailed = false;
         if (success && reservations.isStillHeld(p.getReservationId())) {
-            p.setStatus(PaymentStatus.COMPLETED);
-            repository.save(p);
+            transition.setStatus(PaymentStatus.COMPLETED);
+            publishCompleted = true;
+        } else if (success) {
+            // Paid, but the reservation is gone (cancelled meanwhile): never keep money for nothing.
+            transition.setStatus(PaymentStatus.REFUND_REQUIRED);
+            transition.setFailureReason("paid but reservation no longer held");
+        } else {
+            transition.setStatus(PaymentStatus.FAILED);
+            transition.setFailureReason(failureReason);
+            publishFailed = true;
+        }
+
+        // A conditional database update is the arbiter when IPN, sync, and reconciliation race.
+        // Publish only after this call wins; the surrounding transaction keeps the update and
+        // outbox record atomic. Persistence/outbox exceptions intentionally propagate to the caller.
+        if (!repository.saveIfPending(transition)) {
+            return;
+        }
+        copySettlementFields(transition, p);
+        if (publishCompleted) {
             outbox.publish(p.getPaymentRequestId().toString(), "payment-completed", "payment-completed",
                     new PaymentCompletedEvent(UUID.randomUUID(), p.getPaymentRequestId(), p.getReservationId()));
         } else if (success) {
-            // Paid, but the reservation is gone (cancelled meanwhile): never keep money for nothing.
-            p.setStatus(PaymentStatus.REFUND_REQUIRED);
-            p.setFailureReason("paid but reservation no longer held");
-            repository.save(p);
             log.error("Payment {} succeeded but reservation {} is not held - refund required", p.getTxnRef(), p.getReservationId());
-        } else {
-            p.setStatus(PaymentStatus.FAILED);
-            p.setFailureReason(failureReason);
-            repository.save(p);
+        } else if (publishFailed) {
             outbox.publish(p.getPaymentRequestId().toString(), "payment-failed", "payment-failed",
                     new PaymentFailedEvent(UUID.randomUUID(), p.getPaymentRequestId(), p.getReservationId(),
                             failureReason == null ? "declined" : failureReason));
         }
         log.info("Payment {} settled -> {}", p.getTxnRef(), p.getStatus());
+    }
+
+    private static PaymentRequest copyOf(PaymentRequest p) {
+        return PaymentRequest.builder()
+                .id(p.getId())
+                .paymentRequestId(p.getPaymentRequestId())
+                .reservationId(p.getReservationId())
+                .amountCents(p.getAmountCents())
+                .status(p.getStatus())
+                .createdAt(p.getCreatedAt())
+                .completedAt(p.getCompletedAt())
+                .provider(p.getProvider())
+                .txnRef(p.getTxnRef())
+                .providerTxnNo(p.getProviderTxnNo())
+                .providerCreatedAt(p.getProviderCreatedAt())
+                .providerPaidAt(p.getProviderPaidAt())
+                .payExpiresAt(p.getPayExpiresAt())
+                .failureReason(p.getFailureReason())
+                .refundedAt(p.getRefundedAt())
+                .paymentUrl(p.getPaymentUrl())
+                .build();
+    }
+
+    private static void copySettlementFields(PaymentRequest source, PaymentRequest target) {
+        target.setStatus(source.getStatus());
+        target.setCompletedAt(source.getCompletedAt());
+        target.setProviderTxnNo(source.getProviderTxnNo());
+        target.setProviderPaidAt(source.getProviderPaidAt());
+        target.setFailureReason(source.getFailureReason());
     }
 
     private static Map<String, String> rsp(String code, String message) {

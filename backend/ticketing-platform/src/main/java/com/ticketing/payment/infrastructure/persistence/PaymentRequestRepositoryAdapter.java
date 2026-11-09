@@ -25,6 +25,13 @@ public class PaymentRequestRepositoryAdapter implements PaymentRequestRepository
     }
 
     @Override
+    public boolean saveIfPending(PaymentRequest paymentRequest) {
+        return jpaRepository.updateIfPending(paymentRequest.getPaymentRequestId(), paymentRequest.getStatus().name(),
+                paymentRequest.getCompletedAt(), paymentRequest.getProviderTxnNo(), paymentRequest.getProviderPaidAt(),
+                paymentRequest.getFailureReason()) == 1;
+    }
+
+    @Override
     public Optional<PaymentRequest> findByTxnRef(String txnRef) {
         return jpaRepository.findByTxnRef(txnRef).map(PaymentRequestRepositoryAdapter::toDomain);
     }

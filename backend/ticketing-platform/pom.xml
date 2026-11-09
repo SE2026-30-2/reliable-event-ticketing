@@ -110,6 +110,12 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>net.jqwik</groupId>
+			<artifactId>jqwik</artifactId>
+			<version>1.9.0</version>
+			<scope>test</scope>
+		</dependency>
 		<!-- Used only by TicketServiceApplicationTests' contextLoads() smoke test - see order-service's
 		     pom.xml for the full rationale (Docker-outside-of-Docker not reliably available in every
 		     CI/sandbox this project runs in). -->

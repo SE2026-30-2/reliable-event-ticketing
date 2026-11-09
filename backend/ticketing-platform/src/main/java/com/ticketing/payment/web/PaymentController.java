@@ -57,7 +57,8 @@ public class PaymentController {
     }
 
     /** VNPay's server-to-server callback. Public by necessity - authenticity is the HMAC signature,
-     * checked inside. Always HTTP 200: the provider reads RspCode, and non-200 only makes it retry. */
+     * checked inside. Processed outcomes return HTTP 200 with RspCode; persistence failures propagate
+     * as non-2xx so VNPay can retry the callback. */
     @GetMapping("/api/payment/vnpay/ipn")
     public Map<String, String> ipn(@RequestParam Map<String, String> params) {
         return online().handleIpn(params);
