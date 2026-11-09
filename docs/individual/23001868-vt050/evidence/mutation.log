@@ -1,0 +1,23 @@
+COMMAND: VT050_SOURCE_REF=8055e41 python3 docs/individual/23001868-vt050/run.py
+SOURCE ref=8055e41 sha256=527f678f781ddb456ec4b736434181f363da6642f06600753863b8fbb6346c2f
+PASS PW1
+PASS PW2
+PASS PW3
+PASS PW4
+PASS PW5
+PASS PW6
+PASS PW7
+PASS PW8
+Exception in thread "main" java.lang.AssertionError: upper bound inclusive
+	at com.ticketing.checkin.application.service.Harness.check(Harness.java:15)
+	at com.ticketing.checkin.application.service.Harness.lambda$main$3(Harness.java:84)
+	at com.ticketing.checkin.application.service.Harness.test(Harness.java:17)
+	at com.ticketing.checkin.application.service.Harness.main(Harness.java:93)
+Traceback (most recent call last):
+  File "/workspace/scratch/7f4fc7090eef/vt050/docs/individual/23001868-vt050/run.py", line 47, in <module>
+    subprocess.run(['java','-cp',str(out/'classes'),PKG+'.application.service.Harness']+sys.argv[1:],check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['java', '-cp', '/tmp/vt050-svngqy8j/classes', 'com.ticketing.checkin.application.service.Harness']' returned non-zero exit status 1.
+
+EXIT_CODE=1

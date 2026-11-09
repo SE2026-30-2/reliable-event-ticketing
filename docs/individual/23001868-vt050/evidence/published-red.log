@@ -1,0 +1,39 @@
+SOURCE ref=0c74978 sha256=a4ac7da1982443a8263bd7766cd603565074d6b5c23878071caab5094565351e
+PASS PW1
+PASS PW2
+PASS PW3
+PASS PW4
+PASS PW5
+PASS PW6
+PASS PW7
+PASS PW8
+PASS B01_upper_equality
+PASS B02_before_start
+PASS N01_bad_signature
+PASS N02_unknown_device
+PASS F01_unrelated_constraint_propagates
+PASS R01_sequential_replay
+Exception in thread "main" java.util.concurrent.ExecutionException: org.springframework.dao.DataIntegrityViolationException: unique idempotency_key
+	at java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.base/java.util.concurrent.FutureTask.get(FutureTask.java:205)
+	at com.ticketing.checkin.application.service.Harness.concurrent(Harness.java:63)
+	at com.ticketing.checkin.application.service.Harness.lambda$main$9(Harness.java:90)
+	at com.ticketing.checkin.application.service.Harness.test(Harness.java:17)
+	at com.ticketing.checkin.application.service.Harness.main(Harness.java:93)
+Caused by: org.springframework.dao.DataIntegrityViolationException: unique idempotency_key
+	at com.ticketing.checkin.application.service.Harness$Repo.save(Harness.java:31)
+	at com.ticketing.checkin.application.service.SubmitCheckinApplicationService.persist(SubmitCheckinApplicationService.java:128)
+	at com.ticketing.checkin.application.service.SubmitCheckinApplicationService.submitCheckin(SubmitCheckinApplicationService.java:99)
+	at com.ticketing.checkin.application.service.Harness.lambda$concurrent$0(Harness.java:62)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Traceback (most recent call last):
+  File "/workspace/scratch/7f4fc7090eef/vt050/docs/individual/23001868-vt050/run.py", line 47, in <module>
+    subprocess.run(['java','-cp',str(out/'classes'),PKG+'.application.service.Harness']+sys.argv[1:],check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['java', '-cp', '/tmp/vt050-rtygsdl4/classes', 'com.ticketing.checkin.application.service.Harness']' returned non-zero exit status 1.
+
+EXIT_CODE=1
