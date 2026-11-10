@@ -131,6 +131,7 @@ Khi loại vé hết (hoặc không đủ cho số lượng muốn mua), ngườ
 
 - Khi quota trống ra (hết hạn giữ chỗ, thanh toán thất bại, ai đó từ chối lời mời), `WaitlistPromotionJob` (30 giây/lần) duyệt hàng đợi theo thứ tự vào và **cấp một reservation thật** — giữ chỗ có thời hạn như mua bình thường — cho người đầu tiên *vừa với* số vé trống (người cần nhiều hơn số trống giữ nguyên vị trí), rồi gửi email kèm link thanh toán.
 - Hết hạn mà không trả → quota nhả lại và người kế tiếp được mời. Trạng thái: `WAITING → OFFERED → CONVERTED` (đã trả) hoặc `EXPIRED` (lỡ); `CANCELLED` khi tự rời.
+- Khi tự rời một entry còn `WAITING`, người mua có 30 giây để hoàn tác qua `POST /api/waitlist/{id}/undo`. Hoàn tác giữ nguyên `created_at`, nên không mất vị trí FIFO. Trong thời gian đó entry vẫn tính vào giới hạn 5 hàng đợi/tài khoản và không thể vào lại cùng loại vé. Nếu promotion đã khóa/xử lý entry trước đó hoặc hết 30 giây, undo trả `409`. Từ chối entry `OFFERED` không thể undo vì reservation được nhả cho người kế tiếp ngay lập tức.
 - **Chống chen ngang**: khi có người đang chờ *vừa với* số vé trống, người mua thường bị từ chối (`409`) — quota vừa nhả thuộc về người đã xếp hàng.
 - Mỗi tài khoản một chỗ cho mỗi loại vé và tối đa 5 hàng đợi. Từ chối lời mời (`DELETE /api/waitlist/{id}`) nhả ngay vé đang giữ cho người kế tiếp.
 

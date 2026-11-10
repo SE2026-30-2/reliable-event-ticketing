@@ -116,6 +116,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/ticket/*/transfer").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/ticket-types/*/waitlist").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/waitlist/*").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/waitlist/*/undo").authenticated()
                         .requestMatchers("/api/my/**").authenticated()
                         .anyRequest().permitAll())
                 .exceptionHandling(ex -> ex

@@ -54,9 +54,15 @@ async function setup(page, options = {}) {
     }
     if (path === '/api/my/waitlist') return route.fulfill({ json: state.waitlist });
     if (path.startsWith('/api/waitlist/')) {
-      const entry = state.waitlist.find(entry => entry.entryId === path.split('/').at(-1));
+      const entryId = path.endsWith('/undo') ? path.split('/').at(-2) : path.split('/').at(-1);
+      const entry = state.waitlist.find(entry => entry.entryId === entryId);
       if (!entry) return route.fulfill({ status: 404, json: {} });
-      entry.status = 'CANCELLED'; return route.fulfill({ json: entry });
+      if (req.method() === 'POST' && path.endsWith('/undo')) {
+        entry.status = 'WAITING'; entry.undoUntil = null;
+      } else {
+        entry.status = 'CANCELLED'; entry.undoUntil = new Date(Date.now() + 30000).toISOString();
+      }
+      return route.fulfill({ json: entry });
     }
     if (path === '/api/payment/requests' && req.method() === 'POST') {
       state.payment ||= { paymentRequestId: '55555555-5555-4555-8555-555555555555', reservationId, status: 'COMPLETED', provider: state.tickets.reduce((sum, t) => sum + t.priceCents, 0) === 0 ? 'FREE' : 'MOCK', amountCents: state.tickets.reduce((sum, t) => sum + t.priceCents, 0) };
@@ -185,6 +191,9 @@ test('waitlist uses entryId, cancels one entry, and offered checkout uses reserv
   await page.getByRole('button', { name: 'Rời danh sách', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Rời danh sách', exact: true })).toHaveCount(0);
   expect(calls.find(call => call.method === 'DELETE').path).toBe('/api/waitlist/wait-1');
+  await page.getByRole('button', { name: 'Hoàn tác', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Rời danh sách', exact: true })).toHaveCount(1);
+  expect(calls.find(call => call.method === 'POST' && call.path.endsWith('/undo')).path).toBe('/api/waitlist/wait-1/undo');
   await page.getByRole('button', { name: 'Thanh toán ngay', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/checkout/${reservationId}$`));
   await expect(page.getByRole('button', { name: /Thanh toán ngay/ })).toBeEnabled();

@@ -12,6 +12,10 @@ import java.util.UUID;
 public interface SpringDataWaitlistJpaRepository extends JpaRepository<WaitlistEntryEntity, Long> {
     Optional<WaitlistEntryEntity> findByEntryId(UUID entryId);
 
+    /** Serializes undo with the promotion job for this entry. */
+    @Query(value = "SELECT * FROM waitlist_entries WHERE entry_id = :entryId FOR UPDATE", nativeQuery = true)
+    Optional<WaitlistEntryEntity> findByEntryIdForUpdate(@Param("entryId") UUID entryId);
+
     /** SKIP LOCKED: two app instances never both promote the same entry. Native because JPQL cannot express it. */
     @Query(value = "SELECT * FROM waitlist_entries WHERE entry_id = :entryId FOR UPDATE SKIP LOCKED", nativeQuery = true)
     Optional<WaitlistEntryEntity> findByEntryIdForUpdateSkipLocked(@Param("entryId") UUID entryId);
@@ -19,8 +23,13 @@ public interface SpringDataWaitlistJpaRepository extends JpaRepository<WaitlistE
     @Query("SELECT w FROM WaitlistEntryEntity w WHERE w.ticketTypeId = :typeId AND w.ownerEmail = :owner AND w.status IN ('WAITING', 'OFFERED')")
     Optional<WaitlistEntryEntity> findActive(@Param("typeId") UUID ticketTypeId, @Param("owner") String ownerEmail);
 
-    @Query("SELECT COUNT(w) FROM WaitlistEntryEntity w WHERE w.ownerEmail = :owner AND w.status IN ('WAITING', 'OFFERED')")
-    long countActiveByOwner(@Param("owner") String ownerEmail);
+    @Query("SELECT w FROM WaitlistEntryEntity w WHERE w.ticketTypeId = :typeId AND w.ownerEmail = :owner AND w.status = 'CANCELLED' AND w.cancelledAt > :after")
+    Optional<WaitlistEntryEntity> findUndoableByTicketTypeAndOwner(@Param("typeId") UUID ticketTypeId,
+                                                                    @Param("owner") String ownerEmail,
+                                                                    @Param("after") java.time.Instant after);
+
+    @Query("SELECT COUNT(w) FROM WaitlistEntryEntity w WHERE w.ownerEmail = :owner AND (w.status IN ('WAITING', 'OFFERED') OR (w.status = 'CANCELLED' AND w.cancelledAt > :after))")
+    long countActiveOrUndoableByOwner(@Param("owner") String ownerEmail, @Param("after") java.time.Instant after);
 
     @Query("SELECT COALESCE(SUM(w.quantity), 0) FROM WaitlistEntryEntity w WHERE w.ticketTypeId = :typeId AND w.status = 'WAITING'")
     long sumWaitingQuantity(@Param("typeId") UUID ticketTypeId);

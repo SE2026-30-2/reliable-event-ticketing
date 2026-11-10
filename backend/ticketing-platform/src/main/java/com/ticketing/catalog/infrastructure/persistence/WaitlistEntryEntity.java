@@ -60,4 +60,7 @@ public class WaitlistEntryEntity {
 
     @Column(name = "created_at", updatable = false, nullable = false)
     private Instant createdAt;
+
+    @Column(name = "cancelled_at")
+    private Instant cancelledAt;
 }

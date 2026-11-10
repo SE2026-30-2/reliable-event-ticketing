@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -28,6 +29,11 @@ public class WaitlistRepositoryAdapter implements WaitlistRepositoryPort {
     }
 
     @Override
+    public Optional<WaitlistEntry> findByEntryIdForUpdate(UUID entryId) {
+        return jpa.findByEntryIdForUpdate(entryId).map(WaitlistRepositoryAdapter::toDomain);
+    }
+
+    @Override
     public Optional<WaitlistEntry> findByEntryIdForUpdateSkipLocked(UUID entryId) {
         return jpa.findByEntryIdForUpdateSkipLocked(entryId).map(WaitlistRepositoryAdapter::toDomain);
     }
@@ -38,8 +44,13 @@ public class WaitlistRepositoryAdapter implements WaitlistRepositoryPort {
     }
 
     @Override
-    public long countActiveByOwner(String ownerEmail) {
-        return jpa.countActiveByOwner(ownerEmail);
+    public Optional<WaitlistEntry> findUndoableByTicketTypeAndOwner(UUID ticketTypeId, String ownerEmail, Instant after) {
+        return jpa.findUndoableByTicketTypeAndOwner(ticketTypeId, ownerEmail, after).map(WaitlistRepositoryAdapter::toDomain);
+    }
+
+    @Override
+    public long countActiveOrUndoableByOwner(String ownerEmail, Instant after) {
+        return jpa.countActiveOrUndoableByOwner(ownerEmail, after);
     }
 
     @Override
@@ -78,13 +89,15 @@ public class WaitlistRepositoryAdapter implements WaitlistRepositoryPort {
         return WaitlistEntryEntity.builder().id(e.getId()).entryId(e.getEntryId()).ticketTypeId(e.getTicketTypeId())
                 .ownerEmail(e.getOwnerEmail()).holderName(e.getHolderName()).holderEmail(e.getHolderEmail())
                 .quantity(e.getQuantity()).status(e.getStatus().name()).reservationId(e.getReservationId())
-                .failureReason(e.getFailureReason()).offeredAt(e.getOfferedAt()).createdAt(e.getCreatedAt()).build();
+                .failureReason(e.getFailureReason()).offeredAt(e.getOfferedAt()).createdAt(e.getCreatedAt())
+                .cancelledAt(e.getCancelledAt()).build();
     }
 
     private static WaitlistEntry toDomain(WaitlistEntryEntity e) {
         return WaitlistEntry.builder().id(e.getId()).entryId(e.getEntryId()).ticketTypeId(e.getTicketTypeId())
                 .ownerEmail(e.getOwnerEmail()).holderName(e.getHolderName()).holderEmail(e.getHolderEmail())
                 .quantity(e.getQuantity()).status(WaitlistStatus.valueOf(e.getStatus())).reservationId(e.getReservationId())
-                .failureReason(e.getFailureReason()).offeredAt(e.getOfferedAt()).createdAt(e.getCreatedAt()).build();
+                .failureReason(e.getFailureReason()).offeredAt(e.getOfferedAt()).createdAt(e.getCreatedAt())
+                .cancelledAt(e.getCancelledAt()).build();
     }
 }
