@@ -12,6 +12,13 @@ import java.util.UUID;
 public interface PaymentRequestRepositoryPort {
     PaymentRequest save(PaymentRequest paymentRequest);
 
+    /**
+     * Persist a settlement only while the stored payment is still PENDING.
+     *
+     * @return true if this call changed the pending row, false if another transition already won
+     */
+    boolean saveIfPending(PaymentRequest paymentRequest);
+
     Optional<PaymentRequest> findByReservationId(UUID reservationId);
 
     Optional<PaymentRequest> findByTxnRef(String txnRef);

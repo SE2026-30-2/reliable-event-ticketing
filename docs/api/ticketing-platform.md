@@ -148,7 +148,7 @@ Trạng thái payment của một reservation (chỉ chủ reservation; người
 Người mua vừa quay về từ VNPay: server **hỏi lại VNPay** (`querydr`, có chữ ký) và giải quyết payment ngay (IPN có thể chậm/không tới được). Trả `PaymentRequest` hiện tại; VNPay không với tới được thì vẫn trả `PENDING`. Chỉ chủ payment.
 
 ### `GET /api/payment/vnpay/ipn` 🔓
-Callback server→server của VNPay (**công khai vì VNPay không có JWT — xác thực bằng chữ ký HMAC-SHA512**). Trả luôn HTTP 200 với `{"RspCode","Message"}`: `00` thành công, `01` không có đơn, `02` đã xử lý (gửi lặp), `04` sai số tiền, `97` sai chữ ký. Thành công chỉ khi cả `vnp_ResponseCode` và `vnp_TransactionStatus` đều `00`. URL này phải là địa chỉ HTTPS công khai, đăng ký trong cổng merchant của VNPay.
+Callback server→server của VNPay (**công khai vì VNPay không có JWT — xác thực bằng chữ ký HMAC-SHA512**). Với callback xử lý được, trả HTTP 200 với `{"RspCode","Message"}`: `00` thành công, `01` không có đơn, `02` đã xử lý (gửi lặp), `04` sai số tiền, `97` sai chữ ký. Thành công chỉ khi cả `vnp_ResponseCode` và `vnp_TransactionStatus` đều `00`. Nếu không lưu được settlement hoặc outbox, request trả non-2xx để VNPay gửi lại; hệ thống không báo thành công trước khi lưu hoàn tất. URL này phải là địa chỉ HTTPS công khai, đăng ký trong cổng merchant của VNPay.
 
 ### `POST /api/payment/requests/{paymentRequestId}/refund` 🛡
 Chỉ ADMIN. Hoàn tiền toàn phần một payment VNPay `COMPLETED`: gọi API refund, payment → `REFUNDED`, event `payment-refunded` làm vé `REFUNDED`. Payment khác trạng thái/nhà cung cấp, hoặc VNPay từ chối → `409`.

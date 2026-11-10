@@ -17,6 +17,7 @@ import com.ticketing.payment.domain.model.PaymentStatus;
 import com.ticketing.shared.application.port.OutboxEventPublisherPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -95,12 +97,13 @@ class OnlinePaymentApplicationServiceTest {
         when(provider.verifyCallback(any())).thenReturn(Optional.of(cb(5_000_000L, true)));
         when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
         when(reservations.isStillHeld(reservationId)).thenReturn(true);
+        when(repository.saveIfPending(any())).thenReturn(true);
 
         assertThat(service.handleIpn(Map.of())).containsEntry("RspCode", "00");
 
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(pending.getProviderTxnNo()).isEqualTo("999");
-        verify(repository).save(pending);
+        verify(repository).saveIfPending(any());
         verify(outbox).publish(any(), eq("payment-completed"), eq("payment-completed"), any(PaymentCompletedEvent.class));
     }
 
@@ -108,6 +111,7 @@ class OnlinePaymentApplicationServiceTest {
     void failedIpnFailsPaymentAndPublishesPaymentFailed() {
         when(provider.verifyCallback(any())).thenReturn(Optional.of(cb(5_000_000L, false)));
         when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
+        when(repository.saveIfPending(any())).thenReturn(true);
 
         assertThat(service.handleIpn(Map.of())).containsEntry("RspCode", "00");
 
@@ -131,6 +135,7 @@ class OnlinePaymentApplicationServiceTest {
         when(provider.verifyCallback(any())).thenReturn(Optional.of(cb(5_000_000L, true)));
         when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
         when(reservations.isStillHeld(reservationId)).thenReturn(false);
+        when(repository.saveIfPending(any())).thenReturn(true);
 
         service.handleIpn(Map.of());
 
@@ -143,6 +148,7 @@ class OnlinePaymentApplicationServiceTest {
         when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
         when(provider.query(pending)).thenReturn(new ProviderTransaction(TransactionState.SUCCESS, 5_000_000L, "999", "20260101101010", "ok"));
         when(reservations.isStillHeld(reservationId)).thenReturn(true);
+        when(repository.saveIfPending(any())).thenReturn(true);
 
         PaymentRequest result = service.sync("ref1", BUYER);
 
@@ -166,6 +172,45 @@ class OnlinePaymentApplicationServiceTest {
     }
 
     @Test
+    void syncDoesNotPublishWhenAnotherSettlementAlreadyWon() {
+        when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
+        when(provider.query(pending)).thenReturn(new ProviderTransaction(
+                TransactionState.SUCCESS, 5_000_000L, "999", "20260101101010", "ok"));
+        when(reservations.isStillHeld(reservationId)).thenReturn(true);
+        when(repository.saveIfPending(any())).thenReturn(false);
+
+        assertThat(service.sync("ref1", BUYER).getStatus()).isEqualTo(PaymentStatus.PENDING);
+        verify(outbox, never()).publish(any(), any(), any(), any());
+    }
+
+    @Test
+    void syncDoesNotReturnSuccessWhenSettlementPersistenceFails() {
+        when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
+        when(provider.query(pending)).thenReturn(new ProviderTransaction(
+                TransactionState.SUCCESS, 5_000_000L, "999", "20260101101010", "ok"));
+        when(reservations.isStillHeld(reservationId)).thenReturn(true);
+        when(repository.saveIfPending(any())).thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThatThrownBy(() -> service.sync("ref1", BUYER))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        verify(outbox, never()).publish(any(), any(), any(), any());
+    }
+
+    @Test
+    void syncPropagatesOutboxFailureAfterSettlement() {
+        when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
+        when(provider.query(pending)).thenReturn(new ProviderTransaction(
+                TransactionState.SUCCESS, 5_000_000L, "999", "20260101101010", "ok"));
+        when(reservations.isStillHeld(reservationId)).thenReturn(true);
+        when(repository.saveIfPending(any())).thenReturn(true);
+        doThrow(new IllegalStateException("outbox unavailable")).when(outbox).publish(any(),
+                eq("payment-completed"), eq("payment-completed"), any(PaymentCompletedEvent.class));
+
+        assertThatThrownBy(() -> service.sync("ref1", BUYER))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("outbox unavailable");
+    }
+
+    @Test
     void syncDoesNotFailAPaymentThatIsMerelyStillOpen() {
         when(repository.findByTxnRef("ref1")).thenReturn(Optional.of(pending));
         when(provider.query(pending)).thenReturn(new ProviderTransaction(TransactionState.NOT_FOUND, 0, null, null, "none"));
@@ -179,6 +224,7 @@ class OnlinePaymentApplicationServiceTest {
         when(repository.findByStatusAndProvider(PaymentStatus.PENDING, "VNPAY")).thenReturn(List.of(pending));
         when(repository.findByStatusAndProvider(PaymentStatus.REFUND_REQUIRED, "VNPAY")).thenReturn(List.of());
         when(provider.query(pending)).thenReturn(new ProviderTransaction(TransactionState.NOT_FOUND, 0, null, null, "none"));
+        when(repository.saveIfPending(any())).thenReturn(true);
 
         service.reconcile();
 
