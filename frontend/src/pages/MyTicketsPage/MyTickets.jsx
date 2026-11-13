@@ -25,6 +25,7 @@ export default function MyTickets() {
     // Data States
     const [tickets, setTickets] = useState([]);
     const [waitlist, setWaitlist] = useState([]);
+    const [clockNow, setClockNow] = useState(() => Date.now());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -96,6 +97,11 @@ export default function MyTickets() {
         void loadData();
     }, []);
 
+    useEffect(() => {
+        const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, []);
+
     // 2. Gọi API gửi lại email vé
     const handleResendEmail = async (ticketId) => {
         try {
@@ -110,11 +116,23 @@ export default function MyTickets() {
     const handleLeaveWaitlist = async (waitlistId, confirm = true) => {
         if (confirm && !window.confirm("Bạn có chắc chắn muốn rời khỏi danh sách chờ này?")) return;
         try {
-            await ticketService.leaveWaitlist(waitlistId);
-            setWaitlist((prev) => prev.filter((item) => item.entryId !== waitlistId));
-            alert("Đã rời khỏi danh sách chờ thành công.");
+            const updated = await ticketService.leaveWaitlist(waitlistId);
+            setWaitlist((prev) => prev.map((item) => item.entryId === waitlistId ? { ...item, ...updated } : item));
+            alert(updated.undoUntil
+                ? "Đã rời danh sách. Bạn có thể hoàn tác trong 30 giây."
+                : "Đã từ chối lời mời; vé được nhường cho người tiếp theo.");
         } catch (err) {
             alert(err.message || "Có lỗi xảy ra khi hủy vị trí chờ.");
+        }
+    };
+
+    const handleUndoLeaveWaitlist = async (waitlistId) => {
+        try {
+            const restored = await ticketService.undoLeaveWaitlist(waitlistId);
+            setWaitlist((prev) => prev.map((item) => item.entryId === waitlistId ? { ...item, ...restored } : item));
+        } catch (err) {
+            alert(err.message || "Không thể hoàn tác; vị trí chờ có thể đã được xử lý.");
+            await loadData();
         }
     };
 
@@ -545,6 +563,16 @@ export default function MyTickets() {
                                                             Từ chối
                                                         </button>
                                                     </div>
+                                                </>
+                                            ) : item.status === "CANCELLED" && item.undoUntil && new Date(item.undoUntil).getTime() > clockNow ? (
+                                                <>
+                                                    <span className="text-xs text-slate-500">Đã rời hàng đợi · có thể hoàn tác trong {Math.ceil((new Date(item.undoUntil).getTime() - clockNow) / 1000)} giây</span>
+                                                    <button
+                                                        onClick={() => handleUndoLeaveWaitlist(item.entryId)}
+                                                        className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition"
+                                                    >
+                                                        Hoàn tác
+                                                    </button>
                                                 </>
                                             ) : <span className="text-xs text-slate-500">{item.status === 'CONVERTED' ? 'Đã hoàn tất đặt vé' : item.status === 'EXPIRED' ? 'Lời mời đã hết hạn' : 'Đã rời danh sách chờ'}</span>}
                                         </div>

@@ -77,5 +77,10 @@ export const ticketService = {
     // Rời khỏi danh sách chờ
     leaveWaitlist: async (waitlistId) => {
         return axiosClient.delete(`/api/waitlist/${waitlistId}`);
+    },
+
+    // Undo leaving a WAITING entry while the server-provided undo window remains open.
+    undoLeaveWaitlist: async (waitlistId) => {
+        return axiosClient.post(`/api/waitlist/${waitlistId}/undo`);
     }
 };

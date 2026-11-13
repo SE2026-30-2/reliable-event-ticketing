@@ -106,8 +106,9 @@ Phân trang Spring (`?page=0&size=20`), trả `Page<Ticket>` **với `qrPayload 
 | Vào hàng đợi | `POST /api/ticket-types/{id}/waitlist` `{quantity 1..10, holderName, holderEmail}` | 👤 (email đã xác minh) |
 | Của tôi | `GET /api/my/waitlist` | 👤 |
 | Rời / từ chối lời mời | `DELETE /api/waitlist/{entryId}` | 👤 |
+| Hoàn tác rời hàng đợi | `POST /api/waitlist/{entryId}/undo` | 👤 |
 
-Entry: `{ entryId, ticketTypeId, quantity, status: WAITING|OFFERED|CONVERTED|EXPIRED|CANCELLED, reservationId, failureReason, offeredAt, createdAt }`. `409` nếu vé đang còn (hãy đặt chỗ), đã ở trong hàng, hoặc quá 5 hàng đợi. `OFFERED` có `reservationId` — đưa người dùng tới `/checkout/{reservationId}`. 10 request/phút/IP.
+Entry: `{ entryId, ticketTypeId, quantity, status: WAITING|OFFERED|CONVERTED|EXPIRED|CANCELLED, reservationId, failureReason, offeredAt, createdAt, undoUntil }`. `undoUntil` chỉ khác `null` sau khi người mua rời một entry `WAITING`; nó bằng thời điểm rời + 30 giây. Chủ entry có thể undo trước deadline để trở lại `WAITING` và giữ nguyên `createdAt`/thứ tự hàng đợi. Trong cửa sổ này, tài khoản chưa thể tạo entry mới cho cùng loại vé; entry đó vẫn được tính vào giới hạn 5 hàng đợi đang hoạt động. Tại deadline hoặc sau đó, trạng thái không còn undo được, hoặc entry đã được promotion, trả `409`. Entry không tồn tại/không thuộc caller trả `404`. Từ chối entry `OFFERED` vẫn nhả reservation cho người kế tiếp và không thể undo. Join waitlist giới hạn 10 request/phút/IP.
 
 ## Quản lý (ORGANIZER / ADMIN, đúng chủ sự kiện) — `/api/manage/events/{eventId}/…`
 
