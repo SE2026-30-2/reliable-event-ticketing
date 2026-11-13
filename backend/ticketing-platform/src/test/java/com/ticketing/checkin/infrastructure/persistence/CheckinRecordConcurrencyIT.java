@@ -52,12 +52,17 @@ class CheckinRecordConcurrencyIT {
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    private long concurrentAccepts(UUID ticketId, int attempts, int maxEntries) throws Exception {
+    private record AttemptResult(AcceptResult result, long elapsedNanos) {}
+
+    private record ConcurrencyResult(long accepted, long p95Millis) {}
+
+    private ConcurrencyResult concurrentAccepts(UUID ticketId, int attempts, int maxEntries) throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(attempts);
         CountDownLatch startGate = new CountDownLatch(1);
-        List<Future<AcceptResult>> futures = IntStream.range(0, attempts)
-                .mapToObj(i -> pool.<AcceptResult>submit(() -> {
+        List<Future<AttemptResult>> futures = IntStream.range(0, attempts)
+                .mapToObj(i -> pool.<AttemptResult>submit(() -> {
                     startGate.await();
+                    long started = System.nanoTime();
                     CheckinRecord record = CheckinRecord.builder()
                             .ticketId(ticketId)
                             .idempotencyKey(UUID.randomUUID())
@@ -66,32 +71,50 @@ class CheckinRecordConcurrencyIT {
                             .detail("concurrent attempt " + i)
                             .createdAt(Instant.now())
                             .build();
-                    return checkinRecordRepositoryPort.tryAccept(record, maxEntries);
+                    AcceptResult result = checkinRecordRepositoryPort.tryAccept(record, maxEntries);
+                    return new AttemptResult(result, System.nanoTime() - started);
                 }))
                 .collect(Collectors.toList());
         startGate.countDown();
         long accepted = 0;
-        for (Future<AcceptResult> f : futures) {
-            if (f.get(20, TimeUnit.SECONDS) == AcceptResult.ACCEPTED) {
-                accepted++;
+        List<Long> elapsedNanos = new java.util.ArrayList<>(attempts);
+        try {
+            for (Future<AttemptResult> future : futures) {
+                AttemptResult result = future.get(60, TimeUnit.SECONDS);
+                elapsedNanos.add(result.elapsedNanos());
+                if (result.result() == AcceptResult.ACCEPTED) {
+                    accepted++;
+                }
             }
+        } finally {
+            pool.shutdownNow();
         }
-        pool.shutdown();
-        return accepted;
+        elapsedNanos.sort(Long::compareTo);
+        long p95Millis = TimeUnit.NANOSECONDS.toMillis(elapsedNanos.get((int) Math.ceil(attempts * 0.95) - 1));
+        return new ConcurrencyResult(accepted, p95Millis);
     }
 
     @Test
     void exactlyOneConcurrentAcceptWinsForTheSameSingleUseTicket() throws Exception {
-        assertThat(concurrentAccepts(UUID.randomUUID(), 8, 1)).isEqualTo(1);
+        assertThat(concurrentAccepts(UUID.randomUUID(), 8, 1).accepted()).isEqualTo(1);
     }
 
     @Test
     void aMultiEntryTicketAdmitsExactlyItsEntriesNoMoreUnderConcurrency() throws Exception {
         UUID ticketId = UUID.randomUUID();
-        assertThat(concurrentAccepts(ticketId, 10, 3)).isEqualTo(3);
+        assertThat(concurrentAccepts(ticketId, 10, 3).accepted()).isEqualTo(3);
         // numbered 1..3 with no gaps or repeats
         assertThat(jdbc.queryForList("SELECT entry_no FROM checkin_records WHERE ticket_id = ? AND outcome = 'ACCEPTED' ORDER BY entry_no",
                 Integer.class, ticketId)).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void twoHundredConcurrentAttemptsPreserveTheOneWinnerInvariant() throws Exception {
+        ConcurrencyResult result = concurrentAccepts(UUID.randomUUID(), 200, 1);
+
+        System.out.printf("VT-051 load harness: tasks=200 accepted=%d p95_ms=%d%n",
+                result.accepted(), result.p95Millis());
+        assertThat(result.accepted()).isEqualTo(1);
     }
 
     @Test
