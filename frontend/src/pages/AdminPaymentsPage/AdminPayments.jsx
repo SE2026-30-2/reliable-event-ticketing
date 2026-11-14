@@ -1,6 +1,6 @@
 import AdminLayout from '../../components/layout/AdminLayout';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import { adminPaymentService, paymentError } from '../../services/adminPaymentService';
 import { Dialog, Icon } from '../EventManagementPage/managementUi';
@@ -49,8 +49,10 @@ function RefundDialog({ payment, api, close, complete, uncertain }) {
 }
 
 function Workspace({ preview }) {
+  const [searchParams] = useSearchParams();
+  const reservationId = searchParams.get('reservationId');
   const api = useMemo(() => preview ? createPreviewService() : adminPaymentService, [preview]);
-  const [query, setQuery] = useState(preview ? previewPayment.reservationId : '');
+  const [query, setQuery] = useState(preview ? previewPayment.reservationId : isUuid(reservationId || '') ? reservationId : '');
   const [lookupType, setLookupType] = useState('reservation');
   const [payment, setPayment] = useState(null), [loading, setLoading] = useState(false), [error, setError] = useState('');
   const [notice, setNotice] = useState(''), [modal, setModal] = useState(null), [needsLookup, setNeedsLookup] = useState(false);
@@ -96,11 +98,11 @@ function Workspace({ preview }) {
               <dl className="ap-data"><dt>Thời gian tạo giao dịch</dt><dd>{dateTime(payment.createdAt)}</dd><dt>Thời gian thanh toán</dt><dd>{dateTime(payment.completedAt)}</dd><dt>Phương thức thanh toán</dt><dd className="ap-provider"><span>{payment.provider === 'VNPAY' ? 'VN' : '₫'}</span>{providerLabels[payment.provider] || payment.provider || 'Chưa ghi nhận'}</dd><dt>Trạng thái</dt><dd><span className={`em-badge ap-status ${payment.status.toLowerCase()}`}>{statusLabels[payment.status] || payment.status}</span></dd></dl>
             </div><div className="ap-payment-total"><div className="ap-payment-art"><Icon name="money" /><div><strong>{providerLabels[payment.provider] || payment.provider}</strong><p>Chi tiết thanh toán</p></div></div><dl className="ap-data"><dt>Mã tham chiếu cổng thanh toán</dt><dd>{payment.txnRef || 'Chưa ghi nhận'}</dd><dt>Tổng thanh toán</dt><dd className="ap-amount">{money(payment.amountCents)}</dd></dl><p className="ap-help">Số tiền ghi nhận từ hệ thống thanh toán.</p>{payment.failureReason && <p className="au-message error">{payment.failureReason}</p>}</div></div>
           </section>
-          <section className="ap-panel" aria-labelledby="ap-actions-title"><h2 id="ap-actions-title"><Icon name="coupon" />Hành động</h2><div className="ap-actions"><article><h3><Icon name="ticket" />Xem chi tiết đặt chỗ</h3><p>Xem thông tin đặt chỗ liên quan đến giao dịch này.</p><button onClick={() => setModal('reservation')}>Xem chi tiết</button></article><article className="ap-refund-action"><h3><Icon name="money" />Hoàn tiền giao dịch</h3><p>{needsLookup ? 'Cần tra cứu lại để xác nhận trạng thái trước khi hoàn tiền tiếp.' : payment.status === 'REFUNDED' ? 'Giao dịch đã được hoàn tiền. Không thể hoàn tiền lần nữa.' : canRefund(payment) ? 'Hoàn toàn bộ số tiền qua VNPay. Vui lòng kiểm tra kỹ thông tin trước khi thực hiện.' : 'Chỉ giao dịch VNPay thanh toán thành công và có số tiền lớn hơn 0 mới được hoàn tiền.'}</p><button disabled={!canRefund(payment) || needsLookup} onClick={() => setModal('refund')}>↶ Hoàn tiền</button></article></div></section>
+          <section className="ap-panel" aria-labelledby="ap-actions-title"><h2 id="ap-actions-title"><Icon name="coupon" />Hành động</h2><div className="ap-actions"><article><h3><Icon name="ticket" />Mã đặt chỗ liên quan</h3><p>Xem các mã giao dịch và số tiền gắn với đặt chỗ.</p><button onClick={() => setModal('reservation')}>Xem mã đặt chỗ</button></article><article className="ap-refund-action"><h3><Icon name="money" />Hoàn tiền giao dịch</h3><p>{needsLookup ? 'Cần tra cứu lại để xác nhận trạng thái trước khi hoàn tiền tiếp.' : payment.status === 'REFUNDED' ? 'Giao dịch đã được hoàn tiền. Không thể hoàn tiền lần nữa.' : canRefund(payment) ? 'Hoàn toàn bộ số tiền qua VNPay. Vui lòng kiểm tra kỹ thông tin trước khi thực hiện.' : 'Chỉ giao dịch VNPay thanh toán thành công và có số tiền lớn hơn 0 mới được hoàn tiền.'}</p><button disabled={!canRefund(payment) || needsLookup} onClick={() => setModal('refund')}>↶ Hoàn tiền</button></article></div></section>
         </>}
       </div>
     {modal === 'refund' && <RefundDialog payment={payment} api={api} close={() => setModal(null)} uncertain={() => setNeedsLookup(true)} complete={(result) => { setPayment(result); setModal(null); setNotice('Hoàn tiền thành công. Trạng thái các vé liên quan sẽ được cập nhật sau ít giây.'); }} />}
-    {modal === 'reservation' && <Dialog title="Thông tin đặt chỗ" close={() => setModal(null)}><dl className="au-detail"><dt>Mã đặt chỗ</dt><dd>{payment.reservationId}</dd><dt>Mã thanh toán</dt><dd>{payment.paymentRequestId}</dd><dt>Tổng thanh toán</dt><dd>{money(payment.amountCents)}</dd></dl><p className="ad-muted">Thông tin người mua, sự kiện và danh sách vé chưa khả dụng trong mục tra cứu này.</p><div className="em-form-actions"><button onClick={() => setModal(null)}>Đóng</button></div></Dialog>}
+    {modal === 'reservation' && <Dialog title="Mã đặt chỗ liên quan" close={() => setModal(null)}><dl className="au-detail"><dt>Mã đặt chỗ</dt><dd>{payment.reservationId}</dd><dt>Mã thanh toán</dt><dd>{payment.paymentRequestId}</dd><dt>Tổng thanh toán</dt><dd>{money(payment.amountCents)}</dd></dl><p className="ad-muted">Mục tra cứu giao dịch không cung cấp thông tin người mua, sự kiện hoặc danh sách vé.</p><div className="em-form-actions"><button onClick={() => setModal(null)}>Đóng</button></div></Dialog>}
   </AdminLayout>;
 }
 

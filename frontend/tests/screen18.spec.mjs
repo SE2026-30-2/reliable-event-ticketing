@@ -47,6 +47,19 @@ test('validates UUID, uses authenticated reservation lookup and converts cents c
   await expect(page.getByRole('button', { name: '↶ Hoàn tiền', exact: true })).toBeEnabled();
 });
 
+test('prefills a linked reservation without looking it up or refunding automatically', async ({ page }) => {
+  const calls = await setup(page);
+  await page.goto(`/admin/payments?reservationId=${reservationId}`);
+  await expect(page).toHaveURL(new RegExp(`reservationId=${reservationId}`));
+  await expect(page.getByRole('textbox', { name: 'Mã đặt chỗ', exact: true })).toHaveValue(reservationId);
+  expect(calls).toHaveLength(0);
+  await page.getByRole('button', { name: '⌕ Tra cứu', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Xem mã đặt chỗ' })).toBeVisible();
+  await page.getByRole('button', { name: 'Xem mã đặt chỗ' }).click();
+  await expect(page.getByRole('dialog')).toContainText(reservationId);
+  expect(calls).toHaveLength(1);
+});
+
 test('refund waits for server confirmation, blocks double submit and prevents dismissal while busy', async ({ page }) => {
   let release;
   const gate = new Promise((resolve) => { release = resolve; });

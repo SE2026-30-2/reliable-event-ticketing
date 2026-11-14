@@ -7,14 +7,14 @@ export default defineConfig({
     channel:
       process.env.PLAYWRIGHT_CHANNEL ||
       (process.platform === "win32" ? "msedge" : undefined),
-    baseURL: "http://localhost:8082",
+    baseURL: "http://localhost:8182",
     viewport: { width: 390, height: 844 },
     trace: "retain-on-failure",
   },
   workers: 1,
   webServer: {
-    command: "npm run web -- --port 8082",
-    url: "http://localhost:8082",
+    command: "npm run web -- --port 8182",
+    url: "http://localhost:8182",
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
   },

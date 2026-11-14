@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/useAuth';
 import { ActionForm, Badge, Dialog, Field, Message, Panel, ResourceState, Stat, Table } from './managementUi';
 import { useResource } from './useResource';
 import { dateRange, dateTime, downloadCsv, localDate, money, number, parseGuests, requiredText, toCents } from './eventManagementUtils';
@@ -96,12 +98,14 @@ export function Devices({ api, event, changed }) {
 }
 
 export function Tickets({ api, event, types }) {
+  const { user } = useAuth();
+  const canManagePayments = user?.roles?.includes('ADMIN');
   const [page, setPage] = useState(0), [refresh, setRefresh] = useState(0), [target, setTarget] = useState(null), [notice, setNotice] = useState('');
   const resource = useResource(api.tickets, [event.eventId, page], refresh);
   return <Panel title="Danh sách vé" action={<span className="em-muted">{resource.data ? `${number(resource.data.totalElements)} vé` : ''}</span>}>
     {notice && <Message>{notice}</Message>}<ResourceState resource={resource} retry={() => setRefresh((n) => n + 1)} />
-    {resource.data && <><Table headers={['Mã vé', 'Người sở hữu / giữ vé', 'Loại vé', 'Trạng thái', 'Phát hành', 'Thao tác']} rows={resource.data.content.map((t) => ({ key: t.ticketId, cells: [<code>{t.ticketId}</code>, <><strong>{t.holderName || '—'}</strong><small>{t.holderEmail}</small><small>Chủ: {t.ownerEmail || 'Vé mời'}</small></>, types.find((type) => type.ticketTypeId === t.ticketTypeId)?.name || t.ticketTypeId, <Badge status={t.status} />, dateTime(t.issuedAt), t.status === 'ISSUED' ? <div className="em-row-actions"><button onClick={() => setTarget({ ...t, nextStatus: 'VOID' })}>Hủy vé</button><button onClick={() => setTarget({ ...t, nextStatus: 'REFUNDED' })}>Hoàn tiền</button></div> : '—'] }))} empty="Chưa có vé nào trong sự kiện." /><div className="em-pagination"><button disabled={page === 0} onClick={() => setPage((n) => n - 1)}>← Trước</button><span>Trang {page + 1} / {Math.max(1, resource.data.totalPages)}</span><button disabled={page + 1 >= resource.data.totalPages} onClick={() => setPage((n) => n + 1)}>Sau →</button></div></>}
-    {target && <Dialog title={target.nextStatus === 'VOID' ? 'Hủy vé?' : 'Xác nhận trạng thái hoàn tiền'} close={() => setTarget(null)}><ActionForm submit={(form) => api.updateTicketStatus(target.ticketId, { status: target.nextStatus, reason: requiredText(form.reason, 'lý do') })} complete={() => { setNotice('Đã cập nhật trạng thái vé.'); setTarget(null); setRefresh((n) => n + 1); }} cancel={() => setTarget(null)} label="Xác nhận" danger><p>Vé của <strong>{target.holderName}</strong> sẽ không còn hợp lệ để vào cổng.</p>{target.nextStatus === 'REFUNDED' && <Message>Thao tác này cập nhật trạng thái vé REFUNDED; không thực hiện giao dịch hoàn tiền qua VNPay. Hoàn tiền thanh toán cần xử lý tại màn quản trị thanh toán.</Message>}<Field label="Lý do"><textarea name="reason" rows={3} required maxLength={1000} /></Field></ActionForm></Dialog>}
+    {resource.data && <><Table headers={['Mã vé', 'Người sở hữu / giữ vé', 'Loại vé', 'Trạng thái', 'Phát hành', 'Thao tác']} rows={resource.data.content.map((t) => ({ key: t.ticketId, cells: [<code>{t.ticketId}</code>, <><strong>{t.holderName || '—'}</strong><small>{t.holderEmail}</small><small>Chủ: {t.ownerEmail || 'Vé mời'}</small></>, types.find((type) => type.ticketTypeId === t.ticketTypeId)?.name || t.ticketTypeId, <Badge status={t.status} />, dateTime(t.issuedAt), t.status === 'ISSUED' ? <div className="em-row-actions"><button onClick={() => setTarget(t)}>Hủy vé</button>{canManagePayments && t.reservationId && <Link to={`/admin/payments?reservationId=${encodeURIComponent(t.reservationId)}`}>Hoàn tiền giao dịch</Link>}</div> : '—'] }))} empty="Chưa có vé nào trong sự kiện." /><div className="em-pagination"><button disabled={page === 0} onClick={() => setPage((n) => n - 1)}>← Trước</button><span>Trang {page + 1} / {Math.max(1, resource.data.totalPages)}</span><button disabled={page + 1 >= resource.data.totalPages} onClick={() => setPage((n) => n + 1)}>Sau →</button></div></>}
+    {target && <Dialog title="Hủy vé?" close={() => setTarget(null)}><ActionForm submit={(form) => api.updateTicketStatus(target.ticketId, { status: 'VOID', reason: requiredText(form.reason, 'lý do') })} complete={() => { setNotice('Đã cập nhật trạng thái vé.'); setTarget(null); setRefresh((n) => n + 1); }} cancel={() => setTarget(null)} label="Xác nhận" danger><p>Vé của <strong>{target.holderName}</strong> sẽ không còn hợp lệ để vào cổng.</p><Field label="Lý do"><textarea name="reason" rows={3} required maxLength={1000} /></Field></ActionForm></Dialog>}
   </Panel>;
 }
 

@@ -3,10 +3,10 @@ import { createPreviewService } from '../src/pages/EventManagementPage/previewSe
 
 async function setup(page, options = {}) {
   const api = createPreviewService(), requests = [];
-  await page.addInitScript(() => {
+  await page.addInitScript((roles) => {
     localStorage.setItem('access_token', 'test-access-token');
-    localStorage.setItem('user', JSON.stringify({ email: 'organizer@example.com', fullName: 'Nhà tổ chức', roles: ['ORGANIZER'] }));
-  });
+    localStorage.setItem('user', JSON.stringify({ email: 'organizer@example.com', fullName: 'Nhà tổ chức', roles }));
+  }, options.roles || ['ORGANIZER']);
   await page.route('http://localhost:8091/**', async (route) => {
     const req = route.request(), url = new URL(req.url()), method = req.method();
     const body = req.postData() ? req.postDataJSON() : null;
@@ -23,7 +23,7 @@ async function setup(page, options = {}) {
       else if (url.pathname.endsWith('/coupons')) data = method === 'POST' ? await api.createCoupon('e1', body) : await api.coupons();
       else if (url.pathname.includes('/coupons/')) data = await api.setCouponActive('e1', url.pathname.split('/').at(-1), body.active);
       else if (url.pathname.endsWith('/guests')) data = await api.inviteGuests('e1', body);
-      else if (url.pathname.endsWith('/tickets')) { data = await api.tickets('e1', Number(url.searchParams.get('page'))); data.content = data.content.map((t) => ({ ...t, qrPayload: 'SENSITIVE-QR-MUST-NOT-RENDER' })); }
+      else if (url.pathname.endsWith('/tickets')) { data = await api.tickets('e1', Number(url.searchParams.get('page'))); data.content = data.content.map((t) => ({ ...t, reservationId: '44444444-4444-4444-8444-444444444444', qrPayload: 'SENSITIVE-QR-MUST-NOT-RENDER' })); }
       else if (url.pathname.endsWith('/status')) data = await api.updateTicketStatus(url.pathname.split('/')[3], body);
       else if (url.pathname === '/api/checkin/devices') {
         data = method === 'POST' ? await api.createDevice(body.eventId, body.label) : await api.devices();
@@ -274,15 +274,18 @@ test('failed mutation keeps dialog and data, no success message', async ({ page 
   await expect(page.getByText('Đã lưu thông tin sự kiện.', { exact: true })).toHaveCount(0);
 });
 
-test('refund requires reason and explains payment limitation', async ({ page }) => {
+test('organizer cannot mark a ticket refunded without a payment refund', async ({ page }) => {
   const requests = await setup(page);
   await tab(page, 'Danh sách vé');
-  await page.getByRole('button', { name: 'Hoàn tiền', exact: true }).first().click();
-  await expect(page.getByRole('dialog')).toContainText('không thực hiện giao dịch hoàn tiền qua VNPay');
-  await page.getByLabel('Lý do').fill('Đã xử lý hoàn tiền');
-  await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
-  await expect(page.getByRole('cell', { name: 'Đã hoàn tiền', exact: true })).toBeVisible();
-  expect(requests.find((r) => r.path.endsWith('/status')).body.status).toBe('REFUNDED');
+  await expect(page.getByRole('button', { name: 'Hoàn tiền', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Hoàn tiền giao dịch' })).toHaveCount(0);
+  expect(requests.some((r) => r.path.endsWith('/status'))).toBeFalsy();
+});
+
+test('admin gets a link to the payment refund screen for a purchased ticket', async ({ page }) => {
+  await setup(page, { roles: ['ADMIN'] });
+  await tab(page, 'Danh sách vé');
+  await expect(page.getByRole('link', { name: 'Hoàn tiền giao dịch' }).first()).toHaveAttribute('href', '/admin/payments?reservationId=44444444-4444-4444-8444-444444444444');
 });
 
 test('loading failure supports retry and export failure remains visible', async ({ page }) => {

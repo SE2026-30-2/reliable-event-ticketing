@@ -8,15 +8,15 @@ export default defineConfig({
   timeout: 30000,
   outputDir: 'tmp/playwright-results',
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: 'http://127.0.0.1:5184',
     channel: process.env.PLAYWRIGHT_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined),
     headless: true,
     viewport: { width: 1440, height: 1000 },
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5174 --strictPort',
-    url: 'http://127.0.0.1:5174',
+    command: 'npm run dev -- --host 127.0.0.1 --port 5184 --strictPort',
+    url: 'http://127.0.0.1:5184',
     reuseExistingServer: !process.env.CI,
   },
 });

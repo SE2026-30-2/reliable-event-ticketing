@@ -1,6 +1,6 @@
 # Màn 18 — Quản trị giao dịch & Hoàn tiền
 
-- Route thật: `/admin/payments`, yêu cầu đăng nhập và role `ADMIN`.
+- Route thật: `/admin/payments`, yêu cầu đăng nhập và role `ADMIN`. Link từ danh sách vé có thể truyền `?reservationId=<UUID>` để điền sẵn mã tra cứu; quản trị viên vẫn phải bấm Tra cứu trước khi hoàn tiền.
 - Preview chỉ trong Vite DEV: `/admin/payments/preview`. Bấm Tra cứu với UUID mẫu đã điền; thao tác chỉ có hiệu lực trong phiên xem thử.
 - Tách page, CSS, utility/preview và service theo cấu trúc các màn 16–17. Dùng lại Dialog/Icon và CSS quản trị hiện có.
 - Gọi trực tiếp ticketing-platform (`VITE_TICKETING_SERVICE_URL`, mặc định port 8091), Bearer access token.
@@ -10,9 +10,9 @@
 
 ## Giới hạn hợp đồng Backend hiện có
 
-Backend hiện có `AdminPaymentController` và `GetAdminPaymentUseCase`, yêu cầu ROLE_ADMIN để tra cứu mọi tài khoản bằng reservation ID/payment ID. Use case đọc trực tiếp repository nên hoạt động cả khi online payment tắt, gồm FREE/MOCK. Buyer endpoint cũ giữ kiểm tra chủ reservation. Cần triển khai backend mới cùng giao diện này.
+Backend hiện có `AdminPaymentController` và `GetAdminPaymentUseCase`, yêu cầu ROLE_ADMIN để tra cứu mọi tài khoản bằng reservation ID/payment ID. Use case đọc trực tiếp repository nên hoạt động cả khi online payment tắt, gồm FREE/MOCK. Buyer endpoint cũ giữ kiểm tra chủ reservation.
 
-DTO chỉ trả paymentRequestId, reservationId, amountCents, provider, status, txnRef, createdAt, completedAt, paymentUrl, failureReason. Không có thông tin sự kiện, người mua, số vé, thời gian hoàn tiền. Giao diện không dựng các dữ liệu này; nút Xem chi tiết hiển thị các thông tin đặt chỗ đã có. Không hiển thị/link paymentUrl trong trang quản trị.
+DTO chỉ trả paymentRequestId, reservationId, amountCents, provider, status, txnRef, createdAt, completedAt, paymentUrl, failureReason. Không có thông tin sự kiện, người mua, số vé, thời gian hoàn tiền. Giao diện không dựng các dữ liệu này; nút Xem mã đặt chỗ chỉ hiển thị các mã và số tiền đã có. Không hiển thị/link paymentUrl trong trang quản trị.
 
 Mẫu PNG có MoMo, hoàn một phần và lý do hoàn tiền; Backend chỉ hỗ trợ hoàn toàn phần VNPay và không nhận amount/reason, nên không triển khai các trường đó.
 

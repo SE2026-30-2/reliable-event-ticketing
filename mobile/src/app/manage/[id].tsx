@@ -700,7 +700,7 @@ function ManagementPanel({
                   <Heading>{ticket.holderName}</Heading>
                   <Body>{ticket.holderEmail}</Body>
                   <Body muted>{ticket.ticketId}</Body>
-                  {["RESERVED", "ISSUED"].includes(ticket.status) && (
+                  {ticket.status === "ISSUED" && (
                     <ConfirmButton
                       title="Vô hiệu hóa vé"
                       disabled={busy || !reason.trim()}

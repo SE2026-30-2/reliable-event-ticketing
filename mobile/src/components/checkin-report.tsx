@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Platform, Share, View } from "react-native";
+import { Platform, View } from "react-native";
 import {
   Badge,
   Body,
@@ -54,16 +54,33 @@ export function CheckinReport({ id }: { id: string }) {
         `/api/manage/events/${id}/${kind}.csv`,
         { responseType: "text" },
       );
+      const content = csv.startsWith("\ufeff") ? csv : `\ufeff${csv}`;
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(
-          new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }),
+          new Blob([content], { type: "text/csv;charset=utf-8" }),
         );
         const link = document.createElement("a");
         link.href = url;
         link.download = `${kind}-${id}.csv`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } else await Share.share({ title: `${kind}-${id}.csv`, message: csv });
+      } else {
+        const [{ File, Paths }, Sharing] = await Promise.all([
+          import("expo-file-system"),
+          import("expo-sharing"),
+        ]);
+        if (!(await Sharing.isAvailableAsync())) {
+          throw new Error("Thiết bị không hỗ trợ chia sẻ tệp.");
+        }
+        const filename = `${kind}-${id}.csv`;
+        const file = new File(Paths.cache, filename);
+        file.create({ overwrite: true });
+        await file.write(content);
+        await Sharing.shareAsync(file.uri, {
+          mimeType: "text/csv",
+          dialogTitle: filename,
+        });
+      }
     } catch (error) {
       setError(messageOf(error));
     } finally {
@@ -137,13 +154,13 @@ export function CheckinReport({ id }: { id: string }) {
         <Feedback message={error} />
         <Button
           secondary
-          title="Chia sẻ CSV người tham dự"
+          title={Platform.OS === "web" ? "Tải CSV người tham dự" : "Chia sẻ tệp CSV người tham dự"}
           disabled={busy}
           onPress={() => exportCsv("attendees")}
         />
         <Button
           secondary
-          title="Chia sẻ CSV thanh toán"
+          title={Platform.OS === "web" ? "Tải CSV thanh toán" : "Chia sẻ tệp CSV thanh toán"}
           disabled={busy}
           onPress={() => exportCsv("payments")}
         />

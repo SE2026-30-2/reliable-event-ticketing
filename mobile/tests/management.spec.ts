@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const eid = "11111111-1111-4111-8111-111111111111";
 const typeId = "22222222-2222-4222-8222-222222222222";
@@ -257,6 +258,20 @@ test("screen 15 rechecks the required reason in an already open confirmation", a
     .click();
   await expect(page.getByText("Đã lưu thay đổi.")).toBeVisible();
   expect(writes).toEqual([{ status: "VOID", reason: "Corrected reason" }]);
+});
+
+test("screen 15 does not offer void for a reserved ticket", async ({ page }) => {
+  await page.route(`**/api/event/${eid}/tickets?**`, (route) =>
+    json(route, {
+      content: [{ ticketId: tid, eventId: eid, holderName: "Vé giữ chỗ", status: "RESERVED" }],
+      totalPages: 1,
+      totalElements: 1,
+    }),
+  );
+  await page.goto(`/manage/${eid}`);
+  await page.getByRole("button", { name: "Danh sách vé", exact: true }).click();
+  await expect(page.getByText("Vé giữ chỗ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vô hiệu hóa vé", exact: true })).toHaveCount(0);
 });
 
 test("screen 15 sends coupon scope, redemption limit and validity instead of an unlimited discount", async ({
@@ -575,4 +590,24 @@ test("screen 15 live report refreshes instead of freezing the first check-in cou
     page.getByText("Đã chấp nhận: 2", { exact: true }),
   ).toBeVisible();
   expect(calls).toBeGreaterThanOrEqual(2);
+});
+
+test("screen 15 downloads an authenticated attendee CSV on web", async ({ page }) => {
+  await page.route(`**/api/manage/events/${eid}/attendees.csv`, (route) => {
+    expect(route.request().headers().authorization).toBe("Bearer management-token");
+    return route.fulfill({
+      status: 200,
+      contentType: "text/csv",
+      body: "\ufeffname,email\r\nGuest,guest@example.test\r\n",
+    });
+  });
+  await page.goto(`/manage/${eid}`);
+  await page.getByRole("button", { name: "Báo cáo soát vé", exact: true }).click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Tải CSV người tham dự" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe(`attendees-${eid}.csv`);
+  expect(await readFile(await file.path(), "utf8")).toBe(
+    "\ufeffname,email\r\nGuest,guest@example.test\r\n",
+  );
 });
