@@ -28,4 +28,5 @@ public class WaitlistEntry {
     private String failureReason;
     private Instant offeredAt;
     private Instant createdAt;
+    private Instant cancelledAt;
 }

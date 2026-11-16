@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +33,8 @@ public class WaitlistApplicationService implements WaitlistUseCase {
     private final TicketTypeRepositoryPort ticketTypeRepositoryPort;
     private final EventRepositoryPort eventRepositoryPort;
     private final CancelReservationUseCase cancelReservationUseCase;
+
+    private Clock clock = Clock.systemUTC();
 
     /** Caps how many lines one account can stand in at once. */
     @Value("${ticketing.waitlist.max-active-per-account:5}")
@@ -56,7 +59,12 @@ public class WaitlistApplicationService implements WaitlistUseCase {
         if (waitlistRepositoryPort.findActive(type.getTicketTypeId(), owner).isPresent()) {
             throw new WaitlistException("You are already on the waiting list for this ticket");
         }
-        if (waitlistRepositoryPort.countActiveByOwner(owner) >= maxActivePerAccount) {
+        if (waitlistRepositoryPort.findUndoableByTicketTypeAndOwner(type.getTicketTypeId(), owner,
+                clock.instant().minusSeconds(WaitlistUseCase.LEAVE_UNDO_WINDOW_SECONDS)).isPresent()) {
+            throw new WaitlistException("You recently left this waiting list; undo it or wait 30 seconds before joining again");
+        }
+        if (waitlistRepositoryPort.countActiveOrUndoableByOwner(owner,
+                clock.instant().minusSeconds(WaitlistUseCase.LEAVE_UNDO_WINDOW_SECONDS)) >= maxActivePerAccount) {
             throw new WaitlistException("You can wait on at most " + maxActivePerAccount + " lists at once");
         }
         WaitlistEntry saved = waitlistRepositoryPort.save(WaitlistEntry.builder()
@@ -75,18 +83,37 @@ public class WaitlistApplicationService implements WaitlistUseCase {
 
     @Override
     public WaitlistEntry leave(UUID entryId, String ownerEmail) {
-        WaitlistEntry entry = waitlistRepositoryPort.findByEntryId(entryId)
+        WaitlistEntry entry = waitlistRepositoryPort.findByEntryIdForUpdate(entryId)
                 .filter(e -> e.getOwnerEmail().equalsIgnoreCase(ownerEmail)) // not yours looks like missing
                 .orElseThrow(() -> new WaitlistEntryNotFoundException(entryId));
         if (entry.getStatus() == WaitlistStatus.WAITING) {
             entry.setStatus(WaitlistStatus.CANCELLED);
+            entry.setCancelledAt(clock.instant());
         } else if (entry.getStatus() == WaitlistStatus.OFFERED) {
             // Declining an offer gives its held tickets straight back to the next in line.
             cancelReservationUseCase.cancelReservation(new CancelReservationCommand(entry.getReservationId(), "waitlist offer declined"));
             entry.setStatus(WaitlistStatus.CANCELLED);
+            entry.setCancelledAt(null);
         } else {
             throw new WaitlistException("This entry is already " + entry.getStatus());
         }
+        return waitlistRepositoryPort.save(entry);
+    }
+
+    @Override
+    public WaitlistEntry undoLeave(UUID entryId, String ownerEmail) {
+        WaitlistEntry entry = waitlistRepositoryPort.findByEntryIdForUpdate(entryId)
+                .filter(e -> e.getOwnerEmail().equalsIgnoreCase(ownerEmail))
+                .orElseThrow(() -> new WaitlistEntryNotFoundException(entryId));
+        if (entry.getStatus() != WaitlistStatus.CANCELLED || entry.getCancelledAt() == null) {
+            throw new WaitlistException("This waitlist entry cannot be undone");
+        }
+        if (!clock.instant().isBefore(entry.getCancelledAt().plusSeconds(WaitlistUseCase.LEAVE_UNDO_WINDOW_SECONDS))) {
+            throw new WaitlistException("The waitlist undo window has expired");
+        }
+
+        entry.setStatus(WaitlistStatus.WAITING);
+        entry.setCancelledAt(null);
         return waitlistRepositoryPort.save(entry);
     }
 }

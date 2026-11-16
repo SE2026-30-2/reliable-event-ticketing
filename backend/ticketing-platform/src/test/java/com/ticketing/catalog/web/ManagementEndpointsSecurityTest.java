@@ -7,9 +7,13 @@ import com.ticketing.catalog.application.port.GetEventUseCase;
 import com.ticketing.catalog.application.port.ListEventsUseCase;
 import com.ticketing.catalog.application.port.ListTicketTypesForEventUseCase;
 import com.ticketing.catalog.application.port.UpdateEventUseCase;
+import com.ticketing.catalog.application.port.WaitlistUseCase;
+import com.ticketing.catalog.application.port.WaitlistUseCase.JoinWaitlistCommand;
 import com.ticketing.catalog.domain.exception.EventNotFoundException;
 import com.ticketing.catalog.domain.model.Event;
 import com.ticketing.catalog.domain.model.EventStatus;
+import com.ticketing.catalog.domain.model.WaitlistEntry;
+import com.ticketing.catalog.domain.model.WaitlistStatus;
 import com.ticketing.checkin.application.port.DeviceRepositoryPort;
 import com.ticketing.checkin.application.port.GetCheckinStatsUseCase;
 import com.ticketing.checkin.application.port.GetCheckinTimelineUseCase;
@@ -45,6 +49,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -60,7 +65,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * organizers' ids), and an ADMIN everywhere.
  */
 @WebMvcTest(controllers = {EventController.class, TicketTypeController.class, CheckinDeviceController.class,
-        CheckinDashboardController.class, ReportController.class})
+        CheckinDashboardController.class, ReportController.class, WaitlistController.class})
 @Import({SecurityConfig.class, CorsConfig.class, GlobalExceptionHandler.class, ManagementAccess.class,
         com.ticketing.shared.web.ratelimit.InMemoryRateLimiter.class})
 class ManagementEndpointsSecurityTest {
@@ -80,6 +85,7 @@ class ManagementEndpointsSecurityTest {
     @MockBean GetCheckinTimelineUseCase timeline;
     @MockBean EventReportService reportService;
     @MockBean EventAccessPort eventAccess;
+    @MockBean WaitlistUseCase waitlist;
 
     private final UUID eventId = UUID.randomUUID();
     private static final String NEW_EVENT = "{\"name\":\"Gig\",\"startsAt\":\"%s\",\"endsAt\":\"%s\"}";
@@ -103,6 +109,43 @@ class ManagementEndpointsSecurityTest {
         mvc.perform(get("/api/checkin/events/{id}/timeline", eventId).with(buyer)).andExpect(status().isForbidden());
         mvc.perform(get("/api/checkin/devices").param("eventId", eventId.toString()).with(buyer)).andExpect(status().isForbidden());
         verify(createEvent, never()).createEvent(any());
+    }
+
+    @Test
+    void undoWaitlistRequiresAnAuthenticatedBuyer() throws Exception {
+        mvc.perform(post("/api/waitlist/{entryId}/undo", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+        verify(waitlist, never()).undoLeave(any(), any());
+    }
+
+    @Test
+    void waitlistQuantityBoundariesRejectValuesOutsideOneThroughTen() throws Exception {
+        var verifiedBuyer = jwt().jwt(j -> j.subject("buyer@x.com").claim("email_verified", true))
+                .authorities(new SimpleGrantedAuthority("ROLE_USER"));
+        UUID ticketTypeId = UUID.randomUUID();
+        String request = "{\"quantity\":%d,\"holderName\":\"Buyer\",\"holderEmail\":\"buyer@x.com\"}";
+
+        mvc.perform(post("/api/ticket-types/{ticketTypeId}/waitlist", ticketTypeId).with(verifiedBuyer)
+                        .contentType(MediaType.APPLICATION_JSON).content(request.formatted(0)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/ticket-types/{ticketTypeId}/waitlist", ticketTypeId).with(verifiedBuyer)
+                        .contentType(MediaType.APPLICATION_JSON).content(request.formatted(11)))
+                .andExpect(status().isBadRequest());
+        verify(waitlist, never()).join(any());
+
+        when(waitlist.join(any())).thenAnswer(inv -> {
+            JoinWaitlistCommand command = inv.getArgument(0);
+            return WaitlistEntry.builder().entryId(UUID.randomUUID()).ticketTypeId(command.ticketTypeId())
+                    .quantity(command.quantity()).status(WaitlistStatus.WAITING).build();
+        });
+        for (int quantity : List.of(1, 10)) {
+            mvc.perform(post("/api/ticket-types/{ticketTypeId}/waitlist", ticketTypeId).with(verifiedBuyer)
+                            .contentType(MediaType.APPLICATION_JSON).content(request.formatted(quantity)))
+                    .andExpect(status().isCreated());
+        }
+        ArgumentCaptor<JoinWaitlistCommand> command = ArgumentCaptor.forClass(JoinWaitlistCommand.class);
+        verify(waitlist, times(2)).join(command.capture());
+        assertThat(command.getAllValues()).extracting(JoinWaitlistCommand::quantity).containsExactly(1, 10);
     }
 
     @Test

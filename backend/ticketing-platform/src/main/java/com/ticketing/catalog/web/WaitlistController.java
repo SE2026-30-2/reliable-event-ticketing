@@ -40,10 +40,11 @@ public class WaitlistController {
     }
 
     public record WaitlistEntryResponse(UUID entryId, UUID ticketTypeId, int quantity, String status, UUID reservationId,
-                                        String failureReason, Instant offeredAt, Instant createdAt) {
+                                        String failureReason, Instant offeredAt, Instant createdAt, Instant undoUntil) {
         static WaitlistEntryResponse from(WaitlistEntry e) {
             return new WaitlistEntryResponse(e.getEntryId(), e.getTicketTypeId(), e.getQuantity(), e.getStatus().name(),
-                    e.getReservationId(), e.getFailureReason(), e.getOfferedAt(), e.getCreatedAt());
+                    e.getReservationId(), e.getFailureReason(), e.getOfferedAt(), e.getCreatedAt(),
+                    e.getCancelledAt() == null ? null : e.getCancelledAt().plusSeconds(WaitlistUseCase.LEAVE_UNDO_WINDOW_SECONDS));
         }
     }
 
@@ -64,5 +65,10 @@ public class WaitlistController {
     @DeleteMapping("/api/waitlist/{entryId}")
     public WaitlistEntryResponse leave(@PathVariable UUID entryId, @AuthenticationPrincipal Jwt jwt) {
         return WaitlistEntryResponse.from(waitlistUseCase.leave(entryId, AuthenticatedUser.email(jwt)));
+    }
+
+    @PostMapping("/api/waitlist/{entryId}/undo")
+    public WaitlistEntryResponse undoLeave(@PathVariable UUID entryId, @AuthenticationPrincipal Jwt jwt) {
+        return WaitlistEntryResponse.from(waitlistUseCase.undoLeave(entryId, AuthenticatedUser.email(jwt)));
     }
 }
